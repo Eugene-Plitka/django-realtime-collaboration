@@ -15,6 +15,7 @@ class Channel(models.Model):
     )
 
     name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
 
     type = models.CharField(
         max_length=20,

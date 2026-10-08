@@ -1,20 +1,17 @@
 from datetime import timedelta
 
+from accounts.models import User
+from chat.models import Channel, ChannelMembership
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from accounts.models import User
-from chat.models import Channel, ChannelMembership
 
 from .models import (
     WorkspaceInvitation,
     WorkspaceMembership,
 )
-
 from .services import (
     accept_workspace_invitation,
     add_workspace_member,

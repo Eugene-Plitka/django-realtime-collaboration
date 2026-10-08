@@ -2,6 +2,9 @@ from django.urls import path
 
 from .views import (
     WorkspaceDetailView,
+    WorkspaceInvitationAcceptView,
+    WorkspaceInvitationCancelView,
+    WorkspaceInvitationListCreateView,
     WorkspaceLeaveView,
     WorkspaceListCreateView,
     WorkspaceMemberAddView,
@@ -9,9 +12,6 @@ from .views import (
     WorkspaceMemberRemoveView,
     WorkspaceMemberRoleUpdateView,
     WorkspaceTransferOwnershipView,
-    WorkspaceInvitationListCreateView,
-    WorkspaceInvitationAcceptView,
-    WorkspaceInvitationCancelView,
 )
 
 urlpatterns = [
