@@ -6,6 +6,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
 
+  redis:
+    image: redis:7-alpine
+
   web:
     build: .
     command: python manage.py runserver 0.0.0.0:8000
@@ -17,6 +20,7 @@ services:
       - "8000:8000"
     depends_on:
       - db
+      - redis
 
 volumes:
   postgres_data:

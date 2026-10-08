@@ -2,3 +2,6 @@ Django
 psycopg[binary]
 djangorestframework
 djangorestframework-simplejwt
+channels
+channels-redis
+daphne

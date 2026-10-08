@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "channels",
     "accounts",
     "workspaces",
     "chat",
@@ -145,12 +146,23 @@ MAILERS = {
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=int(os.environ.get("JWT_ACCESS_MINUTES", 15))
+        minutes=int(os.environ.get("JWT_ACCESS_MINUTES", "15"))
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
-        days=int(os.environ.get("JWT_REFRESH_DAYS", 7))
+        days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))
     ),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+ASGI_APPLICATION = "config.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],
+        },
+    },
 }

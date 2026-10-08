@@ -1,4 +1,7 @@
 from accounts.models import User
+from channels.testing import WebsocketCommunicator
+from config.asgi import application
+from django.test import TransactionTestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -972,3 +975,17 @@ class MessageAPITests(APITestCase):
                 author=outsider,
                 text="I should not be able to send this",
             )
+
+
+class ChannelWebSocketTests(TransactionTestCase):
+    async def test_can_connect_to_channel_websocket(self):
+        communicator = WebsocketCommunicator(
+            application,
+            "/ws/channels/1/",
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertTrue(connected)
+
+        await communicator.disconnect()
