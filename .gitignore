@@ -35,3 +35,6 @@ frontend/dist/
 
 # Docker
 *.pid
+
+#ruff
+ruff.toml
