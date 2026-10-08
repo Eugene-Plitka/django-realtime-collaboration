@@ -81,3 +81,33 @@ def can_add_member_with_role(*, actor_membership, role):
         }
 
     return False
+
+
+def can_invite_with_role(*, actor_membership, role):
+    if actor_membership.role == WorkspaceMembership.Role.OWNER:
+        return role in {
+            WorkspaceMembership.Role.ADMIN,
+            WorkspaceMembership.Role.MEMBER,
+            WorkspaceMembership.Role.GUEST,
+        }
+
+    if actor_membership.role == WorkspaceMembership.Role.ADMIN:
+        return role in {
+            WorkspaceMembership.Role.MEMBER,
+            WorkspaceMembership.Role.GUEST,
+        }
+
+    return False
+
+
+def can_manage_invitations(*, actor_membership):
+    return actor_membership.role in {
+        WorkspaceMembership.Role.OWNER,
+        WorkspaceMembership.Role.ADMIN,
+    }
+
+
+def can_cancel_invitation(*, actor_membership):
+    return can_manage_invitations(
+        actor_membership=actor_membership,
+    )

@@ -9,6 +9,9 @@ from .views import (
     WorkspaceMemberRemoveView,
     WorkspaceMemberRoleUpdateView,
     WorkspaceTransferOwnershipView,
+    WorkspaceInvitationListCreateView,
+    WorkspaceInvitationAcceptView,
+    WorkspaceInvitationCancelView,
 )
 
 urlpatterns = [
@@ -43,5 +46,20 @@ urlpatterns = [
         "<int:workspace_id>/members/add/",
         WorkspaceMemberAddView.as_view(),
         name="workspace-member-add",
+    ),
+    path(
+        "<int:workspace_id>/invitations/",
+        WorkspaceInvitationListCreateView.as_view(),
+        name="workspace-invitation-list-create",
+    ),
+    path(
+        "invitations/<uuid:token>/accept/",
+        WorkspaceInvitationAcceptView.as_view(),
+        name="workspace-invitation-accept",
+    ),
+    path(
+        "<int:workspace_id>/invitations/<int:invitation_id>/cancel/",
+        WorkspaceInvitationCancelView.as_view(),
+        name="workspace-invitation-cancel",
     ),
 ]

@@ -1,12 +1,29 @@
-from accounts.models import User
-from chat.models import Channel, ChannelMembership
+from datetime import timedelta
+
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from workspaces.models import WorkspaceMembership
-from workspaces.services import create_workspace
+from accounts.models import User
+from chat.models import Channel, ChannelMembership
+
+from .models import (
+    WorkspaceInvitation,
+    WorkspaceMembership,
+)
+
+from .services import (
+    accept_workspace_invitation,
+    add_workspace_member,
+    create_workspace,
+    create_workspace_invitation,
+    leave_workspace,
+    remove_workspace_member,
+    transfer_workspace_ownership,
+)
 
 
 class CreateWorkspaceServiceTests(TestCase):
@@ -846,4 +863,612 @@ class WorkspaceAPITests(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_owner_can_create_member_invitation(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        response = self.client.post(
+            reverse(
+                "workspace-invitation-list-create",
+                kwargs={"workspace_id": workspace.id},
+            ),
+            {
+                "email": "member@example.com",
+                "role": WorkspaceMembership.Role.MEMBER,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        self.assertEqual(
+            response.data["email"],
+            "member@example.com",
+        )
+
+    def test_admin_cannot_invite_admin(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        admin = User.objects.create_user(
+            email="admin@example.com",
+            username="admin",
+            password="StrongPassword123!",
+        )
+
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=admin,
+            role=WorkspaceMembership.Role.ADMIN,
+        )
+
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(
+            reverse(
+                "workspace-invitation-list-create",
+                kwargs={"workspace_id": workspace.id},
+            ),
+            {
+                "email": "new-admin@example.com",
+                "role": WorkspaceMembership.Role.ADMIN,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_member_cannot_create_invitation(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        member = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(user=member)
+
+        response = self.client.post(
+            reverse(
+                "workspace-invitation-list-create",
+                kwargs={"workspace_id": workspace.id},
+            ),
+            {
+                "email": "new@example.com",
+                "role": WorkspaceMembership.Role.MEMBER,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_user_can_accept_invitation_for_matching_email(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        invited_user = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        invitation = create_workspace_invitation(
+            workspace=workspace,
+            email="member@example.com",
+            invited_by=self.user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(user=invited_user)
+
+        response = self.client.post(
+            reverse(
+                "workspace-invitation-accept",
+                kwargs={"token": invitation.token},
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        self.assertTrue(
+            WorkspaceMembership.objects.filter(
+                workspace=workspace,
+                user=invited_user,
+                role=WorkspaceMembership.Role.MEMBER,
+            ).exists()
+        )
+
+        invitation.refresh_from_db()
+
+        self.assertEqual(
+            invitation.status,
+            WorkspaceInvitation.Status.ACCEPTED,
+        )
+
+    def test_user_cannot_accept_invitation_for_different_email(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        wrong_user = User.objects.create_user(
+            email="wrong@example.com",
+            username="wrong",
+            password="StrongPassword123!",
+        )
+
+        invitation = create_workspace_invitation(
+            workspace=workspace,
+            email="member@example.com",
+            invited_by=self.user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(user=wrong_user)
+
+        response = self.client.post(
+            reverse(
+                "workspace-invitation-accept",
+                kwargs={"token": invitation.token},
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_owner_can_cancel_pending_invitation(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        invitation = create_workspace_invitation(
+            workspace=workspace,
+            email="member@example.com",
+            invited_by=self.user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        response = self.client.post(
+            reverse(
+                "workspace-invitation-cancel",
+                kwargs={
+                    "workspace_id": workspace.id,
+                    "invitation_id": invitation.id,
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        invitation.refresh_from_db()
+
+        self.assertEqual(
+            invitation.status,
+            WorkspaceInvitation.Status.CANCELLED,
+        )
+
+    def test_owner_can_list_workspace_invitations(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        create_workspace_invitation(
+            workspace=workspace,
+            email="member@example.com",
+            invited_by=self.user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        response = self.client.get(
+            reverse(
+                "workspace-invitation-list-create",
+                kwargs={"workspace_id": workspace.id},
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["email"],
+            "member@example.com",
+        )
+
+    def test_member_cannot_list_workspace_invitations(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        member = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(user=member)
+
+        response = self.client.get(
+            reverse(
+                "workspace-invitation-list-create",
+                kwargs={"workspace_id": workspace.id},
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_cancelled_invitation_cannot_be_accepted(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        invited_user = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        invitation = create_workspace_invitation(
+            workspace=workspace,
+            email="member@example.com",
+            invited_by=self.user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        invitation.status = WorkspaceInvitation.Status.CANCELLED
+        invitation.save(update_fields=["status"])
+
+        self.client.force_authenticate(user=invited_user)
+
+        response = self.client.post(
+            reverse(
+                "workspace-invitation-accept",
+                kwargs={"token": invitation.token},
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertFalse(
+            WorkspaceMembership.objects.filter(
+                workspace=workspace,
+                user=invited_user,
+            ).exists()
+        )
+
+    def test_admin_can_list_workspace_invitations(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        admin = User.objects.create_user(
+            email="admin@example.com",
+            username="admin",
+            password="StrongPassword123!",
+        )
+
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=admin,
+            role=WorkspaceMembership.Role.ADMIN,
+        )
+
+        create_workspace_invitation(
+            workspace=workspace,
+            email="member@example.com",
+            invited_by=self.user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.get(
+            reverse(
+                "workspace-invitation-list-create",
+                kwargs={"workspace_id": workspace.id},
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+
+class CreateWorkspaceInvitationServiceTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            email="owner@example.com",
+            username="owner",
+            password="StrongPassword123!",
+        )
+
+        self.workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.owner,
+        )
+
+    def test_create_invitation(self):
+        invitation = create_workspace_invitation(
+            workspace=self.workspace,
+            email="member@example.com",
+            invited_by=self.owner,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.assertEqual(
+            invitation.status,
+            WorkspaceInvitation.Status.PENDING,
+        )
+
+        self.assertEqual(
+            invitation.email,
+            "member@example.com",
+        )
+
+        self.assertEqual(
+            invitation.role,
+            WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.assertGreater(
+            invitation.expires_at,
+            timezone.now(),
+        )
+
+    def test_owner_role_cannot_be_invited(self):
+        with self.assertRaises(ValueError):
+            create_workspace_invitation(
+                workspace=self.workspace,
+                email="member@example.com",
+                invited_by=self.owner,
+                role=WorkspaceMembership.Role.OWNER,
+            )
+
+    def test_existing_member_cannot_be_invited(self):
+        member = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        WorkspaceMembership.objects.create(
+            workspace=self.workspace,
+            user=member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        with self.assertRaises(ValueError):
+            create_workspace_invitation(
+                workspace=self.workspace,
+                email="member@example.com",
+                invited_by=self.owner,
+                role=WorkspaceMembership.Role.MEMBER,
+            )
+
+    def test_duplicate_active_invitation_is_not_allowed(self):
+        create_workspace_invitation(
+            workspace=self.workspace,
+            email="member@example.com",
+            invited_by=self.owner,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        with self.assertRaises(ValueError):
+            create_workspace_invitation(
+                workspace=self.workspace,
+                email="member@example.com",
+                invited_by=self.owner,
+                role=WorkspaceMembership.Role.MEMBER,
+            )
+
+    def test_invitation_can_be_accepted_by_matching_user(self):
+        user = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        invitation = create_workspace_invitation(
+            workspace=self.workspace,
+            email="member@example.com",
+            invited_by=self.owner,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        membership = accept_workspace_invitation(
+            token=invitation.token,
+            user=user,
+        )
+
+        invitation.refresh_from_db()
+
+        self.assertEqual(
+            membership.user,
+            user,
+        )
+
+        self.assertEqual(
+            membership.workspace,
+            self.workspace,
+        )
+
+        self.assertEqual(
+            membership.role,
+            WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.assertEqual(
+            invitation.status,
+            WorkspaceInvitation.Status.ACCEPTED,
+        )
+
+        self.assertIsNotNone(
+            invitation.accepted_at,
+        )
+
+    def test_invitation_cannot_be_accepted_by_different_email(self):
+        user = User.objects.create_user(
+            email="wrong@example.com",
+            username="wrong",
+            password="StrongPassword123!",
+        )
+
+        invitation = create_workspace_invitation(
+            workspace=self.workspace,
+            email="member@example.com",
+            invited_by=self.owner,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        with self.assertRaises(ValueError):
+            accept_workspace_invitation(
+                token=invitation.token,
+                user=user,
+            )
+
+        self.assertFalse(
+            WorkspaceMembership.objects.filter(
+                workspace=self.workspace,
+                user=user,
+            ).exists()
+        )
+
+    def test_expired_invitation_cannot_be_accepted(self):
+        user = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        invitation = create_workspace_invitation(
+            workspace=self.workspace,
+            email="member@example.com",
+            invited_by=self.owner,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        invitation.expires_at = timezone.now() - timedelta(seconds=1)
+        invitation.save(update_fields=["expires_at"])
+
+        with self.assertRaises(ValueError):
+            accept_workspace_invitation(
+                token=invitation.token,
+                user=user,
+            )
+
+        invitation.refresh_from_db()
+
+        self.assertEqual(
+            invitation.status,
+            WorkspaceInvitation.Status.EXPIRED,
+        )
+
+        self.assertFalse(
+            WorkspaceMembership.objects.filter(
+                workspace=self.workspace,
+                user=user,
+            ).exists()
+        )
+
+    def test_accepted_invitation_cannot_be_accepted_twice(self):
+        user = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        invitation = create_workspace_invitation(
+            workspace=self.workspace,
+            email="member@example.com",
+            invited_by=self.owner,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        accept_workspace_invitation(
+            token=invitation.token,
+            user=user,
+        )
+
+        with self.assertRaises(ValueError):
+            accept_workspace_invitation(
+                token=invitation.token,
+                user=user,
+            )
+
+        self.assertEqual(
+            WorkspaceMembership.objects.filter(
+                workspace=self.workspace,
+                user=user,
+            ).count(),
+            1,
         )

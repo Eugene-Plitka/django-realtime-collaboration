@@ -1,7 +1,14 @@
+from datetime import timedelta
+
 from chat.models import Channel, ChannelMembership
 from django.db import transaction
+from django.utils import timezone
 
-from workspaces.models import Workspace, WorkspaceMembership
+from workspaces.models import (
+    Workspace,
+    WorkspaceInvitation,
+    WorkspaceMembership,
+)
 
 
 @transaction.atomic
@@ -102,3 +109,109 @@ def add_workspace_member(*, workspace, user, role):
         )
 
     return membership
+
+
+@transaction.atomic
+def create_workspace_invitation(
+    *,
+    workspace,
+    email,
+    invited_by,
+    role,
+):
+    if role == WorkspaceMembership.Role.OWNER:
+        raise ValueError("Owner role cannot be assigned through invitation.")
+
+    if role not in {
+        WorkspaceMembership.Role.ADMIN,
+        WorkspaceMembership.Role.MEMBER,
+        WorkspaceMembership.Role.GUEST,
+    }:
+        raise ValueError("Invalid invitation role.")
+
+    if WorkspaceMembership.objects.filter(
+        workspace=workspace,
+        user__email__iexact=email,
+    ).exists():
+        raise ValueError("User is already a workspace member.")
+
+    if WorkspaceInvitation.objects.filter(
+        workspace=workspace,
+        email__iexact=email,
+        status=WorkspaceInvitation.Status.PENDING,
+        expires_at__gt=timezone.now(),
+    ).exists():
+        raise ValueError("An active invitation already exists for this email.")
+
+    invitation = WorkspaceInvitation.objects.create(
+        workspace=workspace,
+        email=email.lower(),
+        invited_by=invited_by,
+        role=role,
+        expires_at=timezone.now() + timedelta(days=7),
+    )
+
+    return invitation
+
+
+def accept_workspace_invitation(*, token, user):
+    expired = False
+    membership = None
+
+    with transaction.atomic():
+        invitation = (
+            WorkspaceInvitation.objects.select_for_update()
+            .select_related("workspace")
+            .get(token=token)
+        )
+
+        if invitation.status != WorkspaceInvitation.Status.PENDING:
+            raise ValueError("Invitation is no longer active.")
+
+        if invitation.expires_at <= timezone.now():
+            invitation.status = WorkspaceInvitation.Status.EXPIRED
+            invitation.save(update_fields=["status"])
+
+            expired = True
+
+        else:
+            if invitation.email.lower() != user.email.lower():
+                raise ValueError("This invitation belongs to another email address.")
+
+            if WorkspaceMembership.objects.filter(
+                workspace=invitation.workspace,
+                user=user,
+            ).exists():
+                raise ValueError("User is already a workspace member.")
+
+            membership = add_workspace_member(
+                workspace=invitation.workspace,
+                user=user,
+                role=invitation.role,
+            )
+
+            invitation.status = WorkspaceInvitation.Status.ACCEPTED
+            invitation.accepted_at = timezone.now()
+
+            invitation.save(
+                update_fields=[
+                    "status",
+                    "accepted_at",
+                ]
+            )
+
+    if expired:
+        raise ValueError("Invitation has expired.")
+
+    return membership
+
+
+@transaction.atomic
+def cancel_workspace_invitation(*, invitation):
+    if invitation.status != WorkspaceInvitation.Status.PENDING:
+        raise ValueError("Only pending invitations can be cancelled.")
+
+    invitation.status = WorkspaceInvitation.Status.CANCELLED
+    invitation.save(update_fields=["status"])
+
+    return invitation
