@@ -1,7 +1,12 @@
 from django.db import transaction
+from django.utils import timezone
 from workspaces.models import WorkspaceMembership
 
-from .models import Channel, ChannelMembership
+from .models import (
+    Channel,
+    ChannelMembership,
+    Message,
+)
 
 
 @transaction.atomic
@@ -136,3 +141,54 @@ def remove_channel_member(*, membership):
         )
 
     membership.delete()
+
+
+@transaction.atomic
+def create_message(*, channel, author, text):
+    if not ChannelMembership.objects.filter(
+        channel=channel,
+        user=author,
+    ).exists():
+        raise ValueError("User must be a channel member to send messages.")
+
+    return Message.objects.create(
+        channel=channel,
+        author=author,
+        text=text,
+    )
+
+
+@transaction.atomic
+def edit_message(*, message, text):
+    if message.is_deleted:
+        raise ValueError("Deleted messages cannot be edited.")
+
+    message.text = text
+    message.edited_at = timezone.now()
+
+    message.save(
+        update_fields=[
+            "text",
+            "edited_at",
+            "updated_at",
+        ]
+    )
+
+    return message
+
+
+@transaction.atomic
+def delete_message(*, message):
+    if message.is_deleted:
+        raise ValueError("Message is already deleted.")
+
+    message.is_deleted = True
+
+    message.save(
+        update_fields=[
+            "is_deleted",
+            "updated_at",
+        ]
+    )
+
+    return message

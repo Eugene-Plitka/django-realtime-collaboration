@@ -8,7 +8,12 @@ from workspaces.services import (
     create_workspace,
 )
 
-from .models import Channel, ChannelMembership
+from .models import (
+    Channel,
+    ChannelMembership,
+    Message,
+)
+from .services import create_message
 
 
 class ChannelAPITests(APITestCase):
@@ -628,3 +633,342 @@ class ChannelAPITests(APITestCase):
             remove_response.status_code,
             status.HTTP_204_NO_CONTENT,
         )
+
+
+class MessageAPITests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            email="owner@example.com",
+            username="owner",
+            password="StrongPassword123!",
+        )
+
+        self.member = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        self.other_member = User.objects.create_user(
+            email="other@example.com",
+            username="other",
+            password="StrongPassword123!",
+        )
+
+        self.workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.owner,
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=self.member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=self.other_member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.channel = Channel.objects.create(
+            workspace=self.workspace,
+            name="backend",
+            type=Channel.Type.PUBLIC,
+            created_by=self.owner,
+        )
+
+        ChannelMembership.objects.create(
+            channel=self.channel,
+            user=self.member,
+        )
+
+        ChannelMembership.objects.create(
+            channel=self.channel,
+            user=self.other_member,
+        )
+
+        self.client.force_authenticate(user=self.member)
+
+    def test_channel_member_can_list_messages(self):
+        create_message(
+            channel=self.channel,
+            author=self.member,
+            text="Hello",
+        )
+
+        response = self.client.get(
+            reverse(
+                "message-list",
+                kwargs={
+                    "channel_id": self.channel.id,
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data["results"]),
+            1,
+        )
+
+    def test_non_channel_member_cannot_list_messages(self):
+        outsider = User.objects.create_user(
+            email="outsider@example.com",
+            username="outsider",
+            password="StrongPassword123!",
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=outsider,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(user=outsider)
+
+        response = self.client.get(
+            reverse(
+                "message-list",
+                kwargs={
+                    "channel_id": self.channel.id,
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_author_can_edit_own_message(self):
+        message = create_message(
+            channel=self.channel,
+            author=self.member,
+            text="Old text",
+        )
+
+        response = self.client.patch(
+            reverse(
+                "message-detail",
+                kwargs={"pk": message.id},
+            ),
+            {
+                "text": "New text",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        message.refresh_from_db()
+
+        self.assertEqual(
+            message.text,
+            "New text",
+        )
+
+        self.assertIsNotNone(
+            message.edited_at,
+        )
+
+    def test_user_cannot_edit_other_users_message(self):
+        message = create_message(
+            channel=self.channel,
+            author=self.other_member,
+            text="Other message",
+        )
+
+        response = self.client.patch(
+            reverse(
+                "message-detail",
+                kwargs={"pk": message.id},
+            ),
+            {
+                "text": "Hacked",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_author_can_soft_delete_own_message(self):
+        message = create_message(
+            channel=self.channel,
+            author=self.member,
+            text="Delete me",
+        )
+
+        response = self.client.delete(
+            reverse(
+                "message-detail",
+                kwargs={"pk": message.id},
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        message.refresh_from_db()
+
+        self.assertTrue(
+            message.is_deleted,
+        )
+
+        self.assertTrue(
+            Message.objects.filter(
+                pk=message.id,
+            ).exists()
+        )
+
+    def test_owner_can_delete_other_users_message(self):
+        message = create_message(
+            channel=self.channel,
+            author=self.member,
+            text="Message",
+        )
+
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.delete(
+            reverse(
+                "message-detail",
+                kwargs={"pk": message.id},
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        message.refresh_from_db()
+
+        self.assertTrue(
+            message.is_deleted,
+        )
+
+    def test_deleted_message_text_is_hidden(self):
+        message = create_message(
+            channel=self.channel,
+            author=self.member,
+            text="Secret deleted text",
+        )
+
+        message.is_deleted = True
+        message.save(update_fields=["is_deleted"])
+
+        response = self.client.get(
+            reverse(
+                "message-list",
+                kwargs={
+                    "channel_id": self.channel.id,
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertIsNone(response.data["results"][0]["text"])
+
+    def test_message_history_is_paginated(self):
+        for number in range(55):
+            create_message(
+                channel=self.channel,
+                author=self.member,
+                text=f"Message {number}",
+            )
+
+        response = self.client.get(
+            reverse(
+                "message-list",
+                kwargs={
+                    "channel_id": self.channel.id,
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data["results"]),
+            50,
+        )
+
+        self.assertIsNotNone(
+            response.data["next"],
+        )
+
+    def test_message_history_is_ordered_newest_first(self):
+        first = create_message(
+            channel=self.channel,
+            author=self.member,
+            text="First",
+        )
+
+        second = create_message(
+            channel=self.channel,
+            author=self.member,
+            text="Second",
+        )
+
+        response = self.client.get(
+            reverse(
+                "message-list",
+                kwargs={
+                    "channel_id": self.channel.id,
+                },
+            )
+        )
+
+        results = response.data["results"]
+
+        self.assertEqual(
+            results[0]["id"],
+            second.id,
+        )
+
+        self.assertEqual(
+            results[1]["id"],
+            first.id,
+        )
+
+    def test_non_channel_member_cannot_create_message(self):
+        outsider = User.objects.create_user(
+            email="outsider@example.com",
+            username="outsider",
+            password="StrongPassword123!",
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=outsider,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        with self.assertRaises(ValueError):
+            create_message(
+                channel=self.channel,
+                author=outsider,
+                text="I should not be able to send this",
+            )

@@ -1,6 +1,10 @@
 from rest_framework import serializers
 
-from .models import Channel, ChannelMembership
+from .models import (
+    Channel,
+    ChannelMembership,
+    Message,
+)
 
 
 class ChannelSerializer(serializers.ModelSerializer):
@@ -65,3 +69,43 @@ class ChannelMembershipSerializer(serializers.ModelSerializer):
 
 class ChannelMemberAddSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    author_username = serializers.CharField(
+        source="author.username",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Message
+        fields = (
+            "id",
+            "channel",
+            "author",
+            "author_username",
+            "text",
+            "created_at",
+            "updated_at",
+            "edited_at",
+            "is_deleted",
+        )
+
+        read_only_fields = (
+            "id",
+            "channel",
+            "author",
+            "author_username",
+            "created_at",
+            "updated_at",
+            "edited_at",
+            "is_deleted",
+        )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        if instance.is_deleted:
+            data["text"] = None
+
+        return data

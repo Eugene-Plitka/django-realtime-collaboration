@@ -7,6 +7,8 @@ from .views import (
     ChannelListCreateView,
     ChannelMemberListCreateView,
     ChannelMemberRemoveView,
+    MessageDetailView,
+    MessageListView,
 )
 
 urlpatterns = [
@@ -39,5 +41,15 @@ urlpatterns = [
         "channels/<int:channel_id>/members/<int:membership_id>/",
         ChannelMemberRemoveView.as_view(),
         name="channel-member-remove",
+    ),
+    path(
+        "channels/<int:channel_id>/messages/",
+        MessageListView.as_view(),
+        name="message-list",
+    ),
+    path(
+        "messages/<int:pk>/",
+        MessageDetailView.as_view(),
+        name="message-detail",
     ),
 ]
