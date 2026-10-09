@@ -7,3 +7,4 @@ channels-redis
 daphne
 celery[redis]
 django-allauth[socialaccount]
+django-cors-headers
