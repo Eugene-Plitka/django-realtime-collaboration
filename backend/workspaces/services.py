@@ -12,6 +12,7 @@ from workspaces.models import (
     WorkspaceInvitation,
     WorkspaceMembership,
 )
+from workspaces.tasks import send_workspace_invitation_email
 
 
 @transaction.atomic
@@ -174,6 +175,12 @@ def create_workspace_invitation(
                 "expires_at": invitation.expires_at.isoformat(),
             },
         )
+
+    transaction.on_commit(
+        lambda invitation_id=invitation.id: send_workspace_invitation_email.delay(
+            invitation_id
+        )
+    )
 
     return invitation
 

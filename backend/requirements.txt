@@ -5,3 +5,4 @@ djangorestframework-simplejwt
 channels
 channels-redis
 daphne
+celery[redis]

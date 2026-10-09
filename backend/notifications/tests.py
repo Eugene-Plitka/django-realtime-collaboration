@@ -1,8 +1,11 @@
 from accounts.models import User
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
-from chat.models import Channel
-from chat.services import add_channel_member
+from chat.models import Channel, ChannelMembership
+from chat.services import (
+    add_channel_member,
+    create_message,
+)
 from config.asgi import application
 from django.test import TransactionTestCase
 from django.urls import reverse
@@ -247,6 +250,70 @@ def invite_user_to_workspace(
         email=email,
         invited_by=invited_by,
         role=role,
+    )
+
+
+@database_sync_to_async
+def prepare_mention_channel(
+    *,
+    workspace,
+    channel,
+    author,
+    mentioned_user,
+):
+    if not WorkspaceMembership.objects.filter(
+        workspace=workspace,
+        user=mentioned_user,
+    ).exists():
+        add_workspace_member(
+            workspace=workspace,
+            user=mentioned_user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+    ChannelMembership.objects.get_or_create(
+        channel=channel,
+        user=author,
+    )
+
+    ChannelMembership.objects.get_or_create(
+        channel=channel,
+        user=mentioned_user,
+    )
+
+
+@database_sync_to_async
+def create_message_async(
+    *,
+    channel,
+    author,
+    text,
+):
+    return create_message(
+        channel=channel,
+        author=author,
+        text=text,
+    )
+
+
+@database_sync_to_async
+def mention_notification_count(*, user):
+    return Notification.objects.filter(
+        user=user,
+        type=Notification.Type.MENTION,
+    ).count()
+
+
+@database_sync_to_async
+def add_user_to_workspace_only(
+    *,
+    workspace,
+    user,
+):
+    return add_workspace_member(
+        workspace=workspace,
+        user=user,
+        role=WorkspaceMembership.Role.MEMBER,
     )
 
 
@@ -585,3 +652,163 @@ class NotificationWebSocketTests(TransactionTestCase):
         self.assertTrue(exists)
 
         await communicator.disconnect()
+
+    async def test_message_mention_creates_and_delivers_notification(self):
+        await prepare_mention_channel(
+            workspace=self.workspace,
+            channel=self.channel,
+            author=self.user,
+            mentioned_user=self.other_user,
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            "/ws/notifications/",
+            subprotocols=[f"jwt.{self.other_user_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        message = await create_message_async(
+            channel=self.channel,
+            author=self.user,
+            text=f"Hello @{self.other_user.username}",
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "notification.created",
+        )
+
+        self.assertEqual(
+            response["data"]["type"],
+            Notification.Type.MENTION,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["message_id"],
+            message.id,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["channel_id"],
+            self.channel.id,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["channel_name"],
+            self.channel.name,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["workspace_id"],
+            self.workspace.id,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["author_id"],
+            self.user.id,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["author_username"],
+            self.user.username,
+        )
+
+        count = await mention_notification_count(
+            user=self.other_user,
+        )
+
+        self.assertEqual(
+            count,
+            1,
+        )
+
+        await communicator.disconnect()
+
+    async def test_repeated_mention_creates_only_one_notification(self):
+        await prepare_mention_channel(
+            workspace=self.workspace,
+            channel=self.channel,
+            author=self.user,
+            mentioned_user=self.other_user,
+        )
+
+        await create_message_async(
+            channel=self.channel,
+            author=self.user,
+            text=(
+                f"@{self.other_user.username} "
+                f"please check this, "
+                f"@{self.other_user.username}"
+            ),
+        )
+
+        count = await mention_notification_count(
+            user=self.other_user,
+        )
+
+        self.assertEqual(
+            count,
+            1,
+        )
+
+    async def test_author_does_not_receive_self_mention_notification(self):
+        await prepare_mention_channel(
+            workspace=self.workspace,
+            channel=self.channel,
+            author=self.user,
+            mentioned_user=self.other_user,
+        )
+
+        await create_message_async(
+            channel=self.channel,
+            author=self.user,
+            text=f"@{self.user.username} reminder",
+        )
+
+        count = await mention_notification_count(
+            user=self.user,
+        )
+
+        self.assertEqual(
+            count,
+            0,
+        )
+
+    async def test_user_outside_channel_does_not_receive_mention_notification(self):
+        outsider = await database_sync_to_async(User.objects.create_user)(
+            email="mention-outsider@example.com",
+            username="mention-outsider",
+            password="StrongPassword123!",
+        )
+
+        await add_user_to_workspace_only(
+            workspace=self.workspace,
+            user=outsider,
+        )
+
+        await prepare_mention_channel(
+            workspace=self.workspace,
+            channel=self.channel,
+            author=self.user,
+            mentioned_user=self.other_user,
+        )
+
+        await create_message_async(
+            channel=self.channel,
+            author=self.user,
+            text=f"Hello @{outsider.username}",
+        )
+
+        count = await mention_notification_count(
+            user=outsider,
+        )
+
+        self.assertEqual(
+            count,
+            0,
+        )

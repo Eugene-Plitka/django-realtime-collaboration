@@ -1,3 +1,5 @@
+import re
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -158,6 +160,47 @@ def remove_channel_member(*, membership):
     membership.delete()
 
 
+MENTION_PATTERN = re.compile(r"(?<![\w@])@([A-Za-z0-9_.+-]+)\b")
+
+
+def extract_mentioned_usernames(*, text):
+    return set(MENTION_PATTERN.findall(text))
+
+
+def create_mention_notifications(*, message):
+    usernames = extract_mentioned_usernames(
+        text=message.text,
+    )
+
+    if not usernames:
+        return
+
+    mentioned_memberships = (
+        ChannelMembership.objects.filter(
+            channel=message.channel,
+            user__username__in=usernames,
+        )
+        .exclude(
+            user=message.author,
+        )
+        .select_related("user")
+    )
+
+    for membership in mentioned_memberships:
+        create_and_deliver_notification(
+            user=membership.user,
+            notification_type=Notification.Type.MENTION,
+            payload={
+                "message_id": message.id,
+                "channel_id": message.channel_id,
+                "channel_name": message.channel.name,
+                "workspace_id": message.channel.workspace_id,
+                "author_id": message.author_id,
+                "author_username": message.author.username,
+            },
+        )
+
+
 @transaction.atomic
 def create_message(*, channel, author, text):
     if not ChannelMembership.objects.filter(
@@ -166,11 +209,17 @@ def create_message(*, channel, author, text):
     ).exists():
         raise ValueError("User must be a channel member to send messages.")
 
-    return Message.objects.create(
+    message = Message.objects.create(
         channel=channel,
         author=author,
         text=text,
     )
+
+    create_mention_notifications(
+        message=message,
+    )
+
+    return message
 
 
 @transaction.atomic
