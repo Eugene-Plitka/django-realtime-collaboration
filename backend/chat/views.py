@@ -16,8 +16,6 @@ from .pagination import MessageCursorPagination
 from .permissions import (
     can_access_channel,
     can_access_channel_messages,
-    can_delete_message,
-    can_edit_message,
     can_manage_channel_members,
     can_manage_channels,
     can_self_join_channel,
@@ -34,8 +32,6 @@ from .services import (
     add_channel_member,
     create_channel,
     delete_channel,
-    delete_message,
-    edit_message,
     join_channel,
     leave_channel,
     remove_channel_member,
@@ -453,82 +449,4 @@ class MessageListView(generics.ListAPIView):
             Message.objects.filter(channel=channel)
             .select_related("author")
             .order_by("-created_at")
-        )
-
-
-class MessageDetailView(generics.GenericAPIView):
-    serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_message(self):
-        try:
-            message = Message.objects.select_related(
-                "channel__workspace",
-                "author",
-            ).get(pk=self.kwargs["pk"])
-        except Message.DoesNotExist:
-            raise NotFound()
-
-        workspace_membership = get_workspace_membership(
-            workspace=message.channel.workspace,
-            user=self.request.user,
-        )
-
-        if workspace_membership is None:
-            raise NotFound()
-
-        if not can_access_channel_messages(
-            channel=message.channel,
-            workspace_membership=workspace_membership,
-            user=self.request.user,
-        ):
-            raise NotFound()
-
-        return message, workspace_membership
-
-    def patch(self, request, pk):
-        message, _ = self.get_message()
-
-        if not can_edit_message(
-            message=message,
-            user=request.user,
-        ):
-            raise PermissionDenied("You cannot edit this message.")
-
-        text = request.data.get("text")
-
-        if not text:
-            return Response(
-                {"detail": "Text is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        message = edit_message(
-            message=message,
-            text=text,
-        )
-
-        serializer = self.get_serializer(message)
-
-        return Response(
-            serializer.data,
-            status=status.HTTP_200_OK,
-        )
-
-    def delete(self, request, pk):
-        message, workspace_membership = self.get_message()
-
-        if not can_delete_message(
-            message=message,
-            workspace_membership=workspace_membership,
-            user=request.user,
-        ):
-            raise PermissionDenied("You cannot delete this message.")
-
-        delete_message(
-            message=message,
-        )
-
-        return Response(
-            status=status.HTTP_204_NO_CONTENT,
         )

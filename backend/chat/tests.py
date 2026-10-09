@@ -1,10 +1,12 @@
 from accounts.models import User
+from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from config.asgi import application
 from django.test import TransactionTestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 from workspaces.models import WorkspaceMembership
 from workspaces.services import (
     add_workspace_member,
@@ -21,6 +23,7 @@ from .services import create_message
 
 class ChannelAPITests(APITestCase):
     def setUp(self):
+
         self.owner = User.objects.create_user(
             email="owner@example.com",
             username="owner",
@@ -60,6 +63,7 @@ class ChannelAPITests(APITestCase):
         self.client.force_authenticate(user=self.owner)
 
     def test_owner_can_create_public_channel(self):
+
         response = self.client.post(
             reverse(
                 "channel-list-create",
@@ -88,6 +92,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_member_cannot_create_channel(self):
+
         self.client.force_authenticate(user=self.member)
 
         response = self.client.post(
@@ -110,6 +115,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_private_channel_creator_becomes_channel_member(self):
+
         response = self.client.post(
             reverse(
                 "channel-list-create",
@@ -142,6 +148,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_member_can_list_public_channels(self):
+
         Channel.objects.create(
             workspace=self.workspace,
             name="backend",
@@ -168,9 +175,11 @@ class ChannelAPITests(APITestCase):
         names = {channel["name"] for channel in response.data}
 
         self.assertIn("general", names)
+
         self.assertIn("backend", names)
 
     def test_member_cannot_see_private_channel_without_membership(self):
+
         Channel.objects.create(
             workspace=self.workspace,
             name="management",
@@ -197,6 +206,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_guest_does_not_see_unassigned_public_channel(self):
+
         Channel.objects.create(
             workspace=self.workspace,
             name="backend",
@@ -223,6 +233,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_owner_can_update_channel(self):
+
         channel = Channel.objects.create(
             workspace=self.workspace,
             name="backend",
@@ -255,6 +266,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_member_cannot_update_channel(self):
+
         channel = Channel.objects.create(
             workspace=self.workspace,
             name="backend",
@@ -281,6 +293,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_owner_can_delete_normal_channel(self):
+
         channel = Channel.objects.create(
             workspace=self.workspace,
             name="backend",
@@ -307,6 +320,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_general_channel_cannot_be_deleted(self):
+
         general_channel = Channel.objects.get(
             workspace=self.workspace,
             is_general=True,
@@ -333,6 +347,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_member_can_join_public_channel(self):
+
         channel = Channel.objects.create(
             workspace=self.workspace,
             name="backend",
@@ -362,6 +377,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_guest_cannot_join_public_channel(self):
+
         channel = Channel.objects.create(
             workspace=self.workspace,
             name="backend",
@@ -384,6 +400,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_member_cannot_self_join_private_channel(self):
+
         channel = Channel.objects.create(
             workspace=self.workspace,
             name="management",
@@ -406,6 +423,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_member_can_leave_normal_channel(self):
+
         channel = Channel.objects.create(
             workspace=self.workspace,
             name="backend",
@@ -440,6 +458,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_member_cannot_leave_general_channel(self):
+
         general = Channel.objects.get(
             workspace=self.workspace,
             is_general=True,
@@ -460,6 +479,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_owner_can_add_guest_to_private_channel(self):
+
         channel = Channel.objects.create(
             workspace=self.workspace,
             name="client-private",
@@ -491,6 +511,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_cannot_add_non_workspace_user_to_channel(self):
+
         outsider = User.objects.create_user(
             email="outsider@example.com",
             username="outsider",
@@ -528,6 +549,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_admin_can_remove_member_from_channel(self):
+
         admin = User.objects.create_user(
             email="admin@example.com",
             username="admin",
@@ -570,6 +592,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_member_cannot_be_removed_from_general_channel(self):
+
         general = Channel.objects.get(
             workspace=self.workspace,
             is_general=True,
@@ -596,6 +619,7 @@ class ChannelAPITests(APITestCase):
         )
 
     def test_guest_can_be_added_and_removed_from_general_channel(self):
+
         general = Channel.objects.get(
             workspace=self.workspace,
             is_general=True,
@@ -652,12 +676,6 @@ class MessageAPITests(APITestCase):
             password="StrongPassword123!",
         )
 
-        self.other_member = User.objects.create_user(
-            email="other@example.com",
-            username="other",
-            password="StrongPassword123!",
-        )
-
         self.workspace = create_workspace(
             name="Acme Development",
             slug="acme-development",
@@ -667,12 +685,6 @@ class MessageAPITests(APITestCase):
         add_workspace_member(
             workspace=self.workspace,
             user=self.member,
-            role=WorkspaceMembership.Role.MEMBER,
-        )
-
-        add_workspace_member(
-            workspace=self.workspace,
-            user=self.other_member,
             role=WorkspaceMembership.Role.MEMBER,
         )
 
@@ -688,14 +700,10 @@ class MessageAPITests(APITestCase):
             user=self.member,
         )
 
-        ChannelMembership.objects.create(
-            channel=self.channel,
-            user=self.other_member,
-        )
-
         self.client.force_authenticate(user=self.member)
 
     def test_channel_member_can_list_messages(self):
+
         create_message(
             channel=self.channel,
             author=self.member,
@@ -722,6 +730,7 @@ class MessageAPITests(APITestCase):
         )
 
     def test_non_channel_member_cannot_list_messages(self):
+
         outsider = User.objects.create_user(
             email="outsider@example.com",
             username="outsider",
@@ -750,122 +759,8 @@ class MessageAPITests(APITestCase):
             status.HTTP_404_NOT_FOUND,
         )
 
-    def test_author_can_edit_own_message(self):
-        message = create_message(
-            channel=self.channel,
-            author=self.member,
-            text="Old text",
-        )
-
-        response = self.client.patch(
-            reverse(
-                "message-detail",
-                kwargs={"pk": message.id},
-            ),
-            {
-                "text": "New text",
-            },
-            format="json",
-        )
-
-        self.assertEqual(
-            response.status_code,
-            status.HTTP_200_OK,
-        )
-
-        message.refresh_from_db()
-
-        self.assertEqual(
-            message.text,
-            "New text",
-        )
-
-        self.assertIsNotNone(
-            message.edited_at,
-        )
-
-    def test_user_cannot_edit_other_users_message(self):
-        message = create_message(
-            channel=self.channel,
-            author=self.other_member,
-            text="Other message",
-        )
-
-        response = self.client.patch(
-            reverse(
-                "message-detail",
-                kwargs={"pk": message.id},
-            ),
-            {
-                "text": "Hacked",
-            },
-            format="json",
-        )
-
-        self.assertEqual(
-            response.status_code,
-            status.HTTP_403_FORBIDDEN,
-        )
-
-    def test_author_can_soft_delete_own_message(self):
-        message = create_message(
-            channel=self.channel,
-            author=self.member,
-            text="Delete me",
-        )
-
-        response = self.client.delete(
-            reverse(
-                "message-detail",
-                kwargs={"pk": message.id},
-            )
-        )
-
-        self.assertEqual(
-            response.status_code,
-            status.HTTP_204_NO_CONTENT,
-        )
-
-        message.refresh_from_db()
-
-        self.assertTrue(
-            message.is_deleted,
-        )
-
-        self.assertTrue(
-            Message.objects.filter(
-                pk=message.id,
-            ).exists()
-        )
-
-    def test_owner_can_delete_other_users_message(self):
-        message = create_message(
-            channel=self.channel,
-            author=self.member,
-            text="Message",
-        )
-
-        self.client.force_authenticate(user=self.owner)
-
-        response = self.client.delete(
-            reverse(
-                "message-detail",
-                kwargs={"pk": message.id},
-            )
-        )
-
-        self.assertEqual(
-            response.status_code,
-            status.HTTP_204_NO_CONTENT,
-        )
-
-        message.refresh_from_db()
-
-        self.assertTrue(
-            message.is_deleted,
-        )
-
     def test_deleted_message_text_is_hidden(self):
+
         message = create_message(
             channel=self.channel,
             author=self.member,
@@ -873,6 +768,7 @@ class MessageAPITests(APITestCase):
         )
 
         message.is_deleted = True
+
         message.save(update_fields=["is_deleted"])
 
         response = self.client.get(
@@ -892,6 +788,7 @@ class MessageAPITests(APITestCase):
         self.assertIsNone(response.data["results"][0]["text"])
 
     def test_message_history_is_paginated(self):
+
         for number in range(55):
             create_message(
                 channel=self.channel,
@@ -923,6 +820,7 @@ class MessageAPITests(APITestCase):
         )
 
     def test_message_history_is_ordered_newest_first(self):
+
         first = create_message(
             channel=self.channel,
             author=self.member,
@@ -957,6 +855,7 @@ class MessageAPITests(APITestCase):
         )
 
     def test_non_channel_member_cannot_create_message(self):
+
         outsider = User.objects.create_user(
             email="outsider@example.com",
             username="outsider",
@@ -977,15 +876,718 @@ class MessageAPITests(APITestCase):
             )
 
 
+@database_sync_to_async
+def message_exists(*, channel, author, text):
+    return Message.objects.filter(
+        channel=channel,
+        author=author,
+        text=text,
+    ).exists()
+
+
+@database_sync_to_async
+def remove_channel_membership(*, channel, user):
+    ChannelMembership.objects.filter(
+        channel=channel,
+        user=user,
+    ).delete()
+
+
+@database_sync_to_async
+def get_message_state(message_id):
+    message = Message.objects.get(pk=message_id)
+
+    return {
+        "text": message.text,
+        "edited_at": message.edited_at,
+        "is_deleted": message.is_deleted,
+    }
+
+
+@database_sync_to_async
+def create_test_message(*, channel, author, text):
+    return Message.objects.create(
+        channel=channel,
+        author=author,
+        text=text,
+    )
+
+
 class ChannelWebSocketTests(TransactionTestCase):
-    async def test_can_connect_to_channel_websocket(self):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            email="owner-ws@example.com",
+            username="owner-ws",
+            password="StrongPassword123!",
+        )
+
+        self.member = User.objects.create_user(
+            email="member-ws@example.com",
+            username="member-ws",
+            password="StrongPassword123!",
+        )
+
+        self.second_member = User.objects.create_user(
+            email="second-ws@example.com",
+            username="second-ws",
+            password="StrongPassword123!",
+        )
+
+        self.outsider = User.objects.create_user(
+            email="outsider-ws@example.com",
+            username="outsider-ws",
+            password="StrongPassword123!",
+        )
+
+        self.non_workspace_user = User.objects.create_user(
+            email="non-workspace@example.com",
+            username="non-workspace",
+            password="StrongPassword123!",
+        )
+
+        self.workspace = create_workspace(
+            name="WebSocket Workspace",
+            slug="websocket-workspace",
+            user=self.owner,
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=self.member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=self.outsider,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=self.second_member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.channel = Channel.objects.create(
+            workspace=self.workspace,
+            name="backend-ws",
+            type=Channel.Type.PUBLIC,
+            created_by=self.owner,
+        )
+
+        ChannelMembership.objects.create(
+            channel=self.channel,
+            user=self.member,
+        )
+
+        ChannelMembership.objects.create(
+            channel=self.channel,
+            user=self.second_member,
+        )
+
+        ChannelMembership.objects.create(
+            channel=self.channel,
+            user=self.owner,
+        )
+
+        self.owner_token = str(RefreshToken.for_user(self.owner).access_token)
+
+        self.member_token = str(RefreshToken.for_user(self.member).access_token)
+
+        self.second_member_token = str(
+            RefreshToken.for_user(self.second_member).access_token
+        )
+
+        self.outsider_token = str(RefreshToken.for_user(self.outsider).access_token)
+
+        self.non_workspace_token = str(
+            RefreshToken.for_user(self.non_workspace_user).access_token
+        )
+
+    async def test_channel_member_can_connect_with_valid_jwt(self):
         communicator = WebsocketCommunicator(
             application,
-            "/ws/channels/1/",
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, subprotocol = await communicator.connect()
+
+        self.assertTrue(connected)
+        self.assertEqual(
+            subprotocol,
+            f"jwt.{self.member_token}",
+        )
+
+        await communicator.disconnect()
+
+    async def test_websocket_rejects_connection_without_jwt(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
         )
 
         connected, _ = await communicator.connect()
 
+        self.assertFalse(connected)
+
+    async def test_websocket_rejects_invalid_jwt(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=["jwt.invalid-token"],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertFalse(connected)
+
+    async def test_workspace_member_without_channel_membership_cannot_connect(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.outsider_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertFalse(connected)
+
+    async def test_non_workspace_user_cannot_connect(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.non_workspace_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertFalse(connected)
+
+    async def test_user_cannot_connect_to_nonexistent_channel(self):
+        communicator = WebsocketCommunicator(
+            application,
+            "/ws/channels/999999/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertFalse(connected)
+
+    async def test_member_can_create_message_via_websocket(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
         self.assertTrue(connected)
 
+        await communicator.send_json_to(
+            {
+                "type": "message.create",
+                "data": {
+                    "text": "Hello WebSocket",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "message.created",
+        )
+        self.assertEqual(
+            response["data"]["text"],
+            "Hello WebSocket",
+        )
+        self.assertEqual(
+            response["data"]["author_id"],
+            self.member.id,
+        )
+
+        self.assertTrue(
+            await message_exists(
+                channel=self.channel,
+                author=self.member,
+                text="Hello WebSocket",
+            )
+        )
+
         await communicator.disconnect()
+
+    async def test_message_is_broadcast_to_other_channel_members(self):
+        sender = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        receiver = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.second_member_token}"],
+        )
+
+        sender_connected, _ = await sender.connect()
+        receiver_connected, _ = await receiver.connect()
+
+        self.assertTrue(sender_connected)
+        self.assertTrue(receiver_connected)
+
+        await sender.send_json_to(
+            {
+                "type": "message.create",
+                "data": {
+                    "text": "Broadcast message",
+                },
+            }
+        )
+
+        sender_response = await sender.receive_json_from()
+        receiver_response = await receiver.receive_json_from()
+
+        self.assertEqual(
+            sender_response["type"],
+            "message.created",
+        )
+        self.assertEqual(
+            receiver_response["type"],
+            "message.created",
+        )
+        self.assertEqual(
+            receiver_response["data"]["text"],
+            "Broadcast message",
+        )
+        self.assertEqual(
+            sender_response["data"]["id"],
+            receiver_response["data"]["id"],
+        )
+
+        await sender.disconnect()
+        await receiver.disconnect()
+
+    async def test_empty_message_is_rejected(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await communicator.send_json_to(
+            {
+                "type": "message.create",
+                "data": {
+                    "text": "   ",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "error",
+        )
+        self.assertEqual(
+            response["data"]["code"],
+            "invalid_message_text",
+        )
+
+        await communicator.disconnect()
+
+    async def test_unknown_websocket_event_returns_error(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await communicator.send_json_to(
+            {
+                "type": "something.unknown",
+                "data": {},
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "error",
+        )
+        self.assertEqual(
+            response["data"]["code"],
+            "unsupported_event",
+        )
+
+        await communicator.disconnect()
+
+    async def test_message_create_rechecks_channel_membership(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await remove_channel_membership(
+            channel=self.channel,
+            user=self.member,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "message.create",
+                "data": {
+                    "text": "Should fail",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "error",
+        )
+        self.assertEqual(
+            response["data"]["code"],
+            "channel_access_denied",
+        )
+
+        await communicator.disconnect()
+
+    async def test_author_can_update_message_via_websocket(self):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.member,
+            text="Original text",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await communicator.send_json_to(
+            {
+                "type": "message.update",
+                "data": {
+                    "message_id": message.id,
+                    "text": "Updated text",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "message.updated",
+        )
+        self.assertEqual(
+            response["data"]["text"],
+            "Updated text",
+        )
+        self.assertIsNotNone(response["data"]["edited_at"])
+
+        state = await get_message_state(message.id)
+
+        self.assertEqual(
+            state["text"],
+            "Updated text",
+        )
+        self.assertIsNotNone(state["edited_at"])
+
+        await communicator.disconnect()
+
+    async def test_user_cannot_update_other_users_message(self):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.second_member,
+            text="Not yours",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await communicator.send_json_to(
+            {
+                "type": "message.update",
+                "data": {
+                    "message_id": message.id,
+                    "text": "Hacked",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "error",
+        )
+        self.assertEqual(
+            response["data"]["code"],
+            "message_edit_forbidden",
+        )
+
+        await communicator.disconnect()
+
+    async def test_author_can_delete_own_message(self):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.member,
+            text="Delete me",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await communicator.send_json_to(
+            {
+                "type": "message.delete",
+                "data": {
+                    "message_id": message.id,
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "message.deleted",
+        )
+        self.assertTrue(response["data"]["is_deleted"])
+        self.assertIsNone(response["data"]["text"])
+
+        state = await get_message_state(message.id)
+
+        self.assertTrue(state["is_deleted"])
+
+        await communicator.disconnect()
+
+    async def test_owner_can_delete_other_users_message(self):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.member,
+            text="Moderate me",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.owner_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await communicator.send_json_to(
+            {
+                "type": "message.delete",
+                "data": {
+                    "message_id": message.id,
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "message.deleted",
+        )
+        self.assertTrue(response["data"]["is_deleted"])
+        self.assertIsNone(response["data"]["text"])
+
+        state = await get_message_state(message.id)
+
+        self.assertTrue(state["is_deleted"])
+
+        await communicator.disconnect()
+
+    async def test_member_cannot_delete_other_users_message(self):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.second_member,
+            text="Protected",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await communicator.send_json_to(
+            {
+                "type": "message.delete",
+                "data": {
+                    "message_id": message.id,
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "error",
+        )
+        self.assertEqual(
+            response["data"]["code"],
+            "message_delete_forbidden",
+        )
+
+        state = await get_message_state(message.id)
+
+        self.assertFalse(state["is_deleted"])
+
+        await communicator.disconnect()
+
+    async def test_message_update_is_broadcast_to_channel_members(self):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.member,
+            text="Before",
+        )
+
+        sender = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        receiver = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.second_member_token}"],
+        )
+
+        sender_connected, _ = await sender.connect()
+        receiver_connected, _ = await receiver.connect()
+
+        self.assertTrue(sender_connected)
+        self.assertTrue(receiver_connected)
+
+        await sender.send_json_to(
+            {
+                "type": "message.update",
+                "data": {
+                    "message_id": message.id,
+                    "text": "After",
+                },
+            }
+        )
+
+        sender_response = await sender.receive_json_from()
+        receiver_response = await receiver.receive_json_from()
+
+        self.assertEqual(
+            sender_response["type"],
+            "message.updated",
+        )
+        self.assertEqual(
+            receiver_response["type"],
+            "message.updated",
+        )
+        self.assertEqual(
+            receiver_response["data"]["text"],
+            "After",
+        )
+        self.assertEqual(
+            sender_response["data"]["id"],
+            receiver_response["data"]["id"],
+        )
+
+        await sender.disconnect()
+        await receiver.disconnect()
+
+    async def test_message_delete_is_broadcast_to_channel_members(self):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.member,
+            text="Delete broadcast",
+        )
+
+        sender = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        receiver = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.second_member_token}"],
+        )
+
+        sender_connected, _ = await sender.connect()
+        receiver_connected, _ = await receiver.connect()
+
+        self.assertTrue(sender_connected)
+        self.assertTrue(receiver_connected)
+
+        await sender.send_json_to(
+            {
+                "type": "message.delete",
+                "data": {
+                    "message_id": message.id,
+                },
+            }
+        )
+
+        sender_response = await sender.receive_json_from()
+        receiver_response = await receiver.receive_json_from()
+
+        self.assertEqual(
+            sender_response["type"],
+            "message.deleted",
+        )
+        self.assertEqual(
+            receiver_response["type"],
+            "message.deleted",
+        )
+        self.assertTrue(receiver_response["data"]["is_deleted"])
+        self.assertIsNone(receiver_response["data"]["text"])
+        self.assertEqual(
+            sender_response["data"]["id"],
+            receiver_response["data"]["id"],
+        )
+
+        await sender.disconnect()
+        await receiver.disconnect()
