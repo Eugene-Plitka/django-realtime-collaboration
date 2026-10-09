@@ -177,6 +177,14 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             await self.handle_message_delete(data)
             return
 
+        if event_type == "typing.start":
+            await self.handle_typing_start()
+            return
+
+        if event_type == "typing.stop":
+            await self.handle_typing_stop()
+            return
+
         await self.send_error(
             code="unsupported_event",
             message="Unsupported event type.",
@@ -375,6 +383,80 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json(
             {
                 "type": "message.deleted",
+                "data": event["data"],
+            }
+        )
+
+    async def handle_typing_start(self):
+        user = self.scope["user"]
+
+        has_access = await user_has_channel_access(
+            channel_id=self.channel_id,
+            user=user,
+        )
+
+        if not has_access:
+            await self.send_error(
+                code="channel_access_denied",
+                message="You no longer have access to this channel.",
+            )
+            return
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "typing.started",
+                "data": {
+                    "user_id": user.id,
+                    "username": user.username,
+                },
+            },
+        )
+
+    async def handle_typing_stop(self):
+        user = self.scope["user"]
+
+        has_access = await user_has_channel_access(
+            channel_id=self.channel_id,
+            user=user,
+        )
+
+        if not has_access:
+            await self.send_error(
+                code="channel_access_denied",
+                message="You no longer have access to this channel.",
+            )
+            return
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "typing.stopped",
+                "data": {
+                    "user_id": user.id,
+                    "username": user.username,
+                },
+            },
+        )
+
+    async def typing_started(self, event):
+        if event["data"]["user_id"] == self.scope["user"].id:
+            return
+
+        await self.send_json(
+            {
+                "type": "typing.started",
+                "data": event["data"],
+            }
+        )
+
+    async def typing_stopped(self, event):
+        if event["data"]["user_id"] == self.scope["user"].id:
+            return
+
+        await self.send_json(
+            {
+                "type": "typing.stopped",
                 "data": event["data"],
             }
         )

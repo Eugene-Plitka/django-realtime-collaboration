@@ -664,6 +664,7 @@ class ChannelAPITests(APITestCase):
 
 class MessageAPITests(APITestCase):
     def setUp(self):
+
         self.owner = User.objects.create_user(
             email="owner@example.com",
             username="owner",
@@ -878,6 +879,7 @@ class MessageAPITests(APITestCase):
 
 @database_sync_to_async
 def message_exists(*, channel, author, text):
+
     return Message.objects.filter(
         channel=channel,
         author=author,
@@ -887,6 +889,7 @@ def message_exists(*, channel, author, text):
 
 @database_sync_to_async
 def remove_channel_membership(*, channel, user):
+
     ChannelMembership.objects.filter(
         channel=channel,
         user=user,
@@ -895,6 +898,7 @@ def remove_channel_membership(*, channel, user):
 
 @database_sync_to_async
 def get_message_state(message_id):
+
     message = Message.objects.get(pk=message_id)
 
     return {
@@ -906,6 +910,7 @@ def get_message_state(message_id):
 
 @database_sync_to_async
 def create_test_message(*, channel, author, text):
+
     return Message.objects.create(
         channel=channel,
         author=author,
@@ -913,8 +918,14 @@ def create_test_message(*, channel, author, text):
     )
 
 
+@database_sync_to_async
+def message_count():
+    return Message.objects.count()
+
+
 class ChannelWebSocketTests(TransactionTestCase):
     def setUp(self):
+
         self.owner = User.objects.create_user(
             email="owner-ws@example.com",
             username="owner-ws",
@@ -1006,6 +1017,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
     async def test_channel_member_can_connect_with_valid_jwt(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1015,6 +1027,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         connected, subprotocol = await communicator.connect()
 
         self.assertTrue(connected)
+
         self.assertEqual(
             subprotocol,
             f"jwt.{self.member_token}",
@@ -1023,6 +1036,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_websocket_rejects_connection_without_jwt(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1033,6 +1047,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         self.assertFalse(connected)
 
     async def test_websocket_rejects_invalid_jwt(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1044,6 +1059,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         self.assertFalse(connected)
 
     async def test_workspace_member_without_channel_membership_cannot_connect(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1055,6 +1071,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         self.assertFalse(connected)
 
     async def test_non_workspace_user_cannot_connect(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1066,6 +1083,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         self.assertFalse(connected)
 
     async def test_user_cannot_connect_to_nonexistent_channel(self):
+
         communicator = WebsocketCommunicator(
             application,
             "/ws/channels/999999/",
@@ -1077,6 +1095,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         self.assertFalse(connected)
 
     async def test_member_can_create_message_via_websocket(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1084,6 +1103,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await communicator.send_json_to(
@@ -1101,10 +1121,12 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "message.created",
         )
+
         self.assertEqual(
             response["data"]["text"],
             "Hello WebSocket",
         )
+
         self.assertEqual(
             response["data"]["author_id"],
             self.member.id,
@@ -1121,6 +1143,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_message_is_broadcast_to_other_channel_members(self):
+
         sender = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1134,9 +1157,11 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         sender_connected, _ = await sender.connect()
+
         receiver_connected, _ = await receiver.connect()
 
         self.assertTrue(sender_connected)
+
         self.assertTrue(receiver_connected)
 
         await sender.send_json_to(
@@ -1149,29 +1174,35 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         sender_response = await sender.receive_json_from()
+
         receiver_response = await receiver.receive_json_from()
 
         self.assertEqual(
             sender_response["type"],
             "message.created",
         )
+
         self.assertEqual(
             receiver_response["type"],
             "message.created",
         )
+
         self.assertEqual(
             receiver_response["data"]["text"],
             "Broadcast message",
         )
+
         self.assertEqual(
             sender_response["data"]["id"],
             receiver_response["data"]["id"],
         )
 
         await sender.disconnect()
+
         await receiver.disconnect()
 
     async def test_empty_message_is_rejected(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1179,6 +1210,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await communicator.send_json_to(
@@ -1196,6 +1228,7 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "error",
         )
+
         self.assertEqual(
             response["data"]["code"],
             "invalid_message_text",
@@ -1204,6 +1237,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_unknown_websocket_event_returns_error(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1211,6 +1245,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await communicator.send_json_to(
@@ -1226,6 +1261,7 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "error",
         )
+
         self.assertEqual(
             response["data"]["code"],
             "unsupported_event",
@@ -1234,6 +1270,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_message_create_rechecks_channel_membership(self):
+
         communicator = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1241,6 +1278,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await remove_channel_membership(
@@ -1263,6 +1301,7 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "error",
         )
+
         self.assertEqual(
             response["data"]["code"],
             "channel_access_denied",
@@ -1271,6 +1310,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_author_can_update_message_via_websocket(self):
+
         message = await create_test_message(
             channel=self.channel,
             author=self.member,
@@ -1284,6 +1324,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await communicator.send_json_to(
@@ -1302,10 +1343,12 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "message.updated",
         )
+
         self.assertEqual(
             response["data"]["text"],
             "Updated text",
         )
+
         self.assertIsNotNone(response["data"]["edited_at"])
 
         state = await get_message_state(message.id)
@@ -1314,11 +1357,13 @@ class ChannelWebSocketTests(TransactionTestCase):
             state["text"],
             "Updated text",
         )
+
         self.assertIsNotNone(state["edited_at"])
 
         await communicator.disconnect()
 
     async def test_user_cannot_update_other_users_message(self):
+
         message = await create_test_message(
             channel=self.channel,
             author=self.second_member,
@@ -1332,6 +1377,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await communicator.send_json_to(
@@ -1350,6 +1396,7 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "error",
         )
+
         self.assertEqual(
             response["data"]["code"],
             "message_edit_forbidden",
@@ -1358,6 +1405,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_author_can_delete_own_message(self):
+
         message = await create_test_message(
             channel=self.channel,
             author=self.member,
@@ -1371,6 +1419,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await communicator.send_json_to(
@@ -1388,7 +1437,9 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "message.deleted",
         )
+
         self.assertTrue(response["data"]["is_deleted"])
+
         self.assertIsNone(response["data"]["text"])
 
         state = await get_message_state(message.id)
@@ -1398,6 +1449,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_owner_can_delete_other_users_message(self):
+
         message = await create_test_message(
             channel=self.channel,
             author=self.member,
@@ -1411,6 +1463,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await communicator.send_json_to(
@@ -1428,7 +1481,9 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "message.deleted",
         )
+
         self.assertTrue(response["data"]["is_deleted"])
+
         self.assertIsNone(response["data"]["text"])
 
         state = await get_message_state(message.id)
@@ -1438,6 +1493,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_member_cannot_delete_other_users_message(self):
+
         message = await create_test_message(
             channel=self.channel,
             author=self.second_member,
@@ -1451,6 +1507,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         connected, _ = await communicator.connect()
+
         self.assertTrue(connected)
 
         await communicator.send_json_to(
@@ -1468,6 +1525,7 @@ class ChannelWebSocketTests(TransactionTestCase):
             response["type"],
             "error",
         )
+
         self.assertEqual(
             response["data"]["code"],
             "message_delete_forbidden",
@@ -1480,6 +1538,7 @@ class ChannelWebSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_message_update_is_broadcast_to_channel_members(self):
+
         message = await create_test_message(
             channel=self.channel,
             author=self.member,
@@ -1499,9 +1558,11 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         sender_connected, _ = await sender.connect()
+
         receiver_connected, _ = await receiver.connect()
 
         self.assertTrue(sender_connected)
+
         self.assertTrue(receiver_connected)
 
         await sender.send_json_to(
@@ -1515,35 +1576,98 @@ class ChannelWebSocketTests(TransactionTestCase):
         )
 
         sender_response = await sender.receive_json_from()
+
         receiver_response = await receiver.receive_json_from()
 
         self.assertEqual(
             sender_response["type"],
             "message.updated",
         )
+
         self.assertEqual(
             receiver_response["type"],
             "message.updated",
         )
+
         self.assertEqual(
             receiver_response["data"]["text"],
             "After",
         )
+
         self.assertEqual(
             sender_response["data"]["id"],
             receiver_response["data"]["id"],
         )
 
         await sender.disconnect()
+
         await receiver.disconnect()
 
     async def test_message_delete_is_broadcast_to_channel_members(self):
+
         message = await create_test_message(
             channel=self.channel,
             author=self.member,
             text="Delete broadcast",
         )
 
+        sender = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        receiver = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.second_member_token}"],
+        )
+
+        sender_connected, _ = await sender.connect()
+
+        receiver_connected, _ = await receiver.connect()
+
+        self.assertTrue(sender_connected)
+
+        self.assertTrue(receiver_connected)
+
+        await sender.send_json_to(
+            {
+                "type": "message.delete",
+                "data": {
+                    "message_id": message.id,
+                },
+            }
+        )
+
+        sender_response = await sender.receive_json_from()
+
+        receiver_response = await receiver.receive_json_from()
+
+        self.assertEqual(
+            sender_response["type"],
+            "message.deleted",
+        )
+
+        self.assertEqual(
+            receiver_response["type"],
+            "message.deleted",
+        )
+
+        self.assertTrue(receiver_response["data"]["is_deleted"])
+
+        self.assertIsNone(receiver_response["data"]["text"])
+
+        self.assertEqual(
+            sender_response["data"]["id"],
+            receiver_response["data"]["id"],
+        )
+
+        await sender.disconnect()
+
+        await receiver.disconnect()
+
+    async def test_typing_start_is_broadcast_to_other_channel_member(self):
         sender = WebsocketCommunicator(
             application,
             f"/ws/channels/{self.channel.id}/",
@@ -1564,30 +1688,108 @@ class ChannelWebSocketTests(TransactionTestCase):
 
         await sender.send_json_to(
             {
-                "type": "message.delete",
-                "data": {
-                    "message_id": message.id,
-                },
+                "type": "typing.start",
+                "data": {},
             }
         )
 
-        sender_response = await sender.receive_json_from()
-        receiver_response = await receiver.receive_json_from()
+        response = await receiver.receive_json_from()
 
-        self.assertEqual(
-            sender_response["type"],
-            "message.deleted",
-        )
-        self.assertEqual(
-            receiver_response["type"],
-            "message.deleted",
-        )
-        self.assertTrue(receiver_response["data"]["is_deleted"])
-        self.assertIsNone(receiver_response["data"]["text"])
-        self.assertEqual(
-            sender_response["data"]["id"],
-            receiver_response["data"]["id"],
-        )
+        self.assertEqual(response["type"], "typing.started")
+        self.assertEqual(response["data"]["user_id"], self.member.id)
+        self.assertEqual(response["data"]["username"], self.member.username)
 
         await sender.disconnect()
         await receiver.disconnect()
+
+    async def test_typing_stop_is_broadcast_to_other_channel_member(self):
+        sender = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        receiver = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.second_member_token}"],
+        )
+
+        sender_connected, _ = await sender.connect()
+        receiver_connected, _ = await receiver.connect()
+
+        self.assertTrue(sender_connected)
+        self.assertTrue(receiver_connected)
+
+        await sender.send_json_to(
+            {
+                "type": "typing.stop",
+                "data": {},
+            }
+        )
+
+        response = await receiver.receive_json_from()
+
+        self.assertEqual(response["type"], "typing.stopped")
+        self.assertEqual(response["data"]["user_id"], self.member.id)
+        self.assertEqual(response["data"]["username"], self.member.username)
+
+        await sender.disconnect()
+        await receiver.disconnect()
+
+    async def test_typing_rechecks_channel_membership(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        await remove_channel_membership(
+            channel=self.channel,
+            user=self.member,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "typing.start",
+                "data": {},
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(response["type"], "error")
+        self.assertEqual(
+            response["data"]["code"],
+            "channel_access_denied",
+        )
+
+        await communicator.disconnect()
+
+    async def test_typing_does_not_create_message(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        before = await message_count()
+
+        await communicator.send_json_to(
+            {
+                "type": "typing.start",
+                "data": {},
+            }
+        )
+
+        after = await message_count()
+
+        self.assertEqual(before, after)
+
+        await communicator.disconnect()
