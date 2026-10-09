@@ -42,6 +42,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "channels",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.github",
     "accounts",
     "workspaces",
     "chat",
@@ -60,6 +65,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -99,6 +105,92 @@ DATABASES = {
 }
 
 AUTH_USER_MODEL = "accounts.User"
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+ACCOUNT_LOGIN_METHODS = {"email"}
+
+ACCOUNT_SIGNUP_FIELDS = [
+    "email*",
+    "username*",
+    "password1*",
+    "password2*",
+]
+
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_QUERY_EMAIL = True
+SOCIALACCOUNT_STORE_TOKENS = False
+
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = False
+
+SOCIALACCOUNT_LOGIN_ON_GET = False
+
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get(
+    "GOOGLE_OAUTH_CLIENT_ID",
+    "",
+).strip()
+
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get(
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+    "",
+).strip()
+
+GITHUB_OAUTH_CLIENT_ID = os.environ.get(
+    "GITHUB_OAUTH_CLIENT_ID",
+    "",
+).strip()
+
+GITHUB_OAUTH_CLIENT_SECRET = os.environ.get(
+    "GITHUB_OAUTH_CLIENT_SECRET",
+    "",
+).strip()
+
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": [
+            "profile",
+            "email",
+        ],
+        "AUTH_PARAMS": {
+            "access_type": "online",
+        },
+        "OAUTH_PKCE_ENABLED": True,
+    },
+    "github": {
+        "SCOPE": [
+            "user:email",
+        ],
+    },
+}
+
+
+if GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET:
+    SOCIALACCOUNT_PROVIDERS["google"]["APP"] = {
+        "client_id": GOOGLE_OAUTH_CLIENT_ID,
+        "secret": GOOGLE_OAUTH_CLIENT_SECRET,
+        "key": "",
+    }
+
+
+if GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET:
+    SOCIALACCOUNT_PROVIDERS["github"]["APP"] = {
+        "client_id": GITHUB_OAUTH_CLIENT_ID,
+        "secret": GITHUB_OAUTH_CLIENT_SECRET,
+        "key": "",
+    }
+
+
+LOGIN_REDIRECT_URL = os.environ.get(
+    "SOCIAL_LOGIN_REDIRECT_URL",
+    "http://localhost:5173/auth/social/callback",
+)
+
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
 

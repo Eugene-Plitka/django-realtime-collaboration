@@ -1,6 +1,8 @@
+from django.contrib.auth import SESSION_KEY
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import AccessToken
 
 from .models import User
 
@@ -108,3 +110,89 @@ class AuthenticationTests(APITestCase):
             "StrongPassword123!",
         )
         self.assertTrue(user.check_password("StrongPassword123!"))
+
+
+class SocialAuthenticationPreparationTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="social@example.com",
+            username="social-user",
+            password="StrongPassword123!",
+        )
+
+    def test_google_login_url_is_registered(self):
+        self.assertEqual(
+            reverse("google_login"),
+            "/accounts/google/login/",
+        )
+
+    def test_github_login_url_is_registered(self):
+        self.assertEqual(
+            reverse("github_login"),
+            "/accounts/github/login/",
+        )
+
+    def test_social_jwt_exchange_requires_session_authentication(
+        self,
+    ):
+        response = self.client.post(reverse("social-jwt-exchange"))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_social_session_can_be_exchanged_for_jwt(
+        self,
+    ):
+        self.client.force_login(
+            self.user,
+        )
+
+        response = self.client.post(reverse("social-jwt-exchange"))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertIn(
+            "access",
+            response.data,
+        )
+
+        self.assertIn(
+            "refresh",
+            response.data,
+        )
+
+        access_token = AccessToken(response.data["access"])
+
+        self.assertEqual(
+            int(access_token["user_id"]),
+            self.user.id,
+        )
+
+    def test_social_session_is_removed_after_jwt_exchange(
+        self,
+    ):
+        self.client.force_login(
+            self.user,
+        )
+
+        self.assertIn(
+            SESSION_KEY,
+            self.client.session,
+        )
+
+        response = self.client.post(reverse("social-jwt-exchange"))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertNotIn(
+            SESSION_KEY,
+            self.client.session,
+        )
