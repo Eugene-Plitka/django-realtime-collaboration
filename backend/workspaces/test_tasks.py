@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from celery.exceptions import Retry
 from django.core import mail
 from django.test import TestCase
 
@@ -85,6 +86,22 @@ class WorkspaceInvitationTaskTests(TestCase):
             len(mail.outbox),
             0,
         )
+
+    @patch(
+        "workspaces.tasks.send_mail",
+        side_effect=ConnectionError("Email server unavailable"),
+    )
+    def test_invitation_email_failure_retries(
+        self,
+        mocked_send_mail,
+    ):
+        with self.assertRaises(Retry):
+            send_workspace_invitation_email.apply(
+                args=[self.invitation.id],
+                throw=True,
+            )
+
+        mocked_send_mail.assert_called_once()
 
 
 class WorkspaceInvitationEnqueueTests(TestCase):

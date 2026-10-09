@@ -3,6 +3,7 @@ from channels.layers import get_channel_layer
 from django.db import transaction
 
 from .models import Notification
+from .tasks import send_notification_email
 
 
 def create_notification(
@@ -72,10 +73,14 @@ def create_and_deliver_notification(
         payload=payload,
     )
 
-    transaction.on_commit(
-        lambda notification=notification: deliver_notification(
-            notification=notification
+    def handle_notification_commit():
+        deliver_notification(
+            notification=notification,
         )
-    )
+
+        if notification.type != Notification.Type.WORKSPACE_INVITATION:
+            send_notification_email.delay(notification.id)
+
+    transaction.on_commit(handle_notification_commit)
 
     return notification
