@@ -23,4 +23,8 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls")),
     path("api/workspaces/", include("workspaces.urls")),
     path("api/", include("chat.urls")),
+    path(
+        "api/",
+        include("notifications.urls"),
+    ),
 ]

@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "accounts",
     "workspaces",
     "chat",
+    "notifications",
 ]
 
 REST_FRAMEWORK = {

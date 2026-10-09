@@ -1,5 +1,11 @@
 from django.db import transaction
 from django.utils import timezone
+
+from notifications.models import Notification
+from notifications.services import (
+    create_notification,
+    deliver_notification,
+)
 from workspaces.models import WorkspaceMembership
 
 from .models import (
@@ -113,10 +119,24 @@ def add_channel_member(*, channel, user):
     ).exists():
         raise ValueError("User is already a channel member.")
 
-    return ChannelMembership.objects.create(
+    membership = ChannelMembership.objects.create(
         channel=channel,
         user=user,
     )
+
+    notification = create_notification(
+        user=user,
+        notification_type=(Notification.Type.CHANNEL_ADDED),
+        payload={
+            "workspace_id": channel.workspace_id,
+            "channel_id": channel.id,
+            "channel_name": channel.name,
+        },
+    )
+
+    transaction.on_commit(lambda: deliver_notification(notification=notification))
+
+    return membership
 
 
 @transaction.atomic
