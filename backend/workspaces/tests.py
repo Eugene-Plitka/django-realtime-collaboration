@@ -5,6 +5,7 @@ from chat.models import Channel, ChannelMembership
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from notifications.models import Notification
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -14,12 +15,8 @@ from .models import (
 )
 from .services import (
     accept_workspace_invitation,
-    add_workspace_member,
     create_workspace,
     create_workspace_invitation,
-    leave_workspace,
-    remove_workspace_member,
-    transfer_workspace_ownership,
 )
 
 
@@ -1280,6 +1277,30 @@ class CreateWorkspaceInvitationServiceTests(TestCase):
         self.assertGreater(
             invitation.expires_at,
             timezone.now(),
+        )
+
+    def test_unregistered_email_can_be_invited(self):
+        invitation = create_workspace_invitation(
+            workspace=self.workspace,
+            email="not-registered@example.com",
+            invited_by=self.owner,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.assertEqual(
+            invitation.email,
+            "not-registered@example.com",
+        )
+
+        self.assertEqual(
+            invitation.status,
+            WorkspaceInvitation.Status.PENDING,
+        )
+
+        self.assertFalse(
+            Notification.objects.filter(
+                type=Notification.Type.WORKSPACE_INVITATION,
+            ).exists()
         )
 
     def test_owner_role_cannot_be_invited(self):

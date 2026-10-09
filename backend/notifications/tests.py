@@ -10,7 +10,11 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 from workspaces.models import WorkspaceMembership
-from workspaces.services import add_workspace_member, create_workspace
+from workspaces.services import (
+    add_workspace_member,
+    create_workspace,
+    create_workspace_invitation,
+)
 
 from .models import Notification
 from .services import (
@@ -227,6 +231,22 @@ def add_user_to_channel(*, channel, user):
     return add_channel_member(
         channel=channel,
         user=user,
+    )
+
+
+@database_sync_to_async
+def invite_user_to_workspace(
+    *,
+    workspace,
+    email,
+    invited_by,
+    role,
+):
+    return create_workspace_invitation(
+        workspace=workspace,
+        email=email,
+        invited_by=invited_by,
+        role=role,
     )
 
 
@@ -489,6 +509,79 @@ class NotificationWebSocketTests(TransactionTestCase):
             user=self.user,
             notification_type=Notification.Type.CHANNEL_ADDED,
         )
+        self.assertTrue(exists)
+
+        await communicator.disconnect()
+
+    async def test_workspace_invitation_creates_and_delivers_notification(self):
+        communicator = WebsocketCommunicator(
+            application,
+            "/ws/notifications/",
+            subprotocols=[f"jwt.{self.other_user_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        invitation = await invite_user_to_workspace(
+            workspace=self.workspace,
+            email=self.other_user.email,
+            invited_by=self.owner,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "notification.created",
+        )
+
+        self.assertEqual(
+            response["data"]["type"],
+            Notification.Type.WORKSPACE_INVITATION,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["invitation_id"],
+            invitation.id,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["workspace_id"],
+            self.workspace.id,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["workspace_name"],
+            self.workspace.name,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["role"],
+            WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["invited_by_id"],
+            self.owner.id,
+        )
+
+        self.assertEqual(
+            response["data"]["payload"]["invited_by_username"],
+            self.owner.username,
+        )
+
+        self.assertNotIn(
+            "token",
+            response["data"]["payload"],
+        )
+
+        exists = await notification_exists(
+            user=self.other_user,
+            notification_type=Notification.Type.WORKSPACE_INVITATION,
+        )
+
         self.assertTrue(exists)
 
         await communicator.disconnect()

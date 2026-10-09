@@ -1,5 +1,6 @@
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.db import transaction
 
 from .models import Notification
 
@@ -71,6 +72,10 @@ def create_and_deliver_notification(
         payload=payload,
     )
 
-    deliver_notification(notification=notification)
+    transaction.on_commit(
+        lambda notification=notification: deliver_notification(
+            notification=notification
+        )
+    )
 
     return notification

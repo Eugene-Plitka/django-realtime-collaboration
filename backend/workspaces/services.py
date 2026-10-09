@@ -1,8 +1,11 @@
 from datetime import timedelta
 
+from accounts.models import User
 from chat.models import Channel, ChannelMembership
 from django.db import transaction
 from django.utils import timezone
+from notifications.models import Notification
+from notifications.services import create_and_deliver_notification
 
 from workspaces.models import (
     Workspace,
@@ -129,15 +132,17 @@ def create_workspace_invitation(
     }:
         raise ValueError("Invalid invitation role.")
 
+    normalized_email = email.lower()
+
     if WorkspaceMembership.objects.filter(
         workspace=workspace,
-        user__email__iexact=email,
+        user__email__iexact=normalized_email,
     ).exists():
         raise ValueError("User is already a workspace member.")
 
     if WorkspaceInvitation.objects.filter(
         workspace=workspace,
-        email__iexact=email,
+        email__iexact=normalized_email,
         status=WorkspaceInvitation.Status.PENDING,
         expires_at__gt=timezone.now(),
     ).exists():
@@ -145,11 +150,30 @@ def create_workspace_invitation(
 
     invitation = WorkspaceInvitation.objects.create(
         workspace=workspace,
-        email=email.lower(),
+        email=normalized_email,
         invited_by=invited_by,
         role=role,
         expires_at=timezone.now() + timedelta(days=7),
     )
+
+    invited_user = User.objects.filter(
+        email__iexact=normalized_email,
+    ).first()
+
+    if invited_user is not None:
+        create_and_deliver_notification(
+            user=invited_user,
+            notification_type=Notification.Type.WORKSPACE_INVITATION,
+            payload={
+                "invitation_id": invitation.id,
+                "workspace_id": workspace.id,
+                "workspace_name": workspace.name,
+                "role": invitation.role,
+                "invited_by_id": invited_by.id,
+                "invited_by_username": invited_by.username,
+                "expires_at": invitation.expires_at.isoformat(),
+            },
+        )
 
     return invitation
 
