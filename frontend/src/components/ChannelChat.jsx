@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -13,6 +14,7 @@ import {
 import {
   createChannelSocket,
 } from "../chat/socket";
+import MemberProfilePopover from "./MemberProfilePopover";
 
 
 function normalizeMessage(message) {
@@ -26,6 +28,11 @@ function normalizeMessage(message) {
       message.author_id,
     author_username:
       message.author_username,
+    reply_to:
+      message.reply_to ?? null,
+    reply_to_message:
+      message.reply_to_message ??
+      null,
     text: message.text,
     created_at: message.created_at,
     updated_at: message.updated_at,
@@ -61,6 +68,40 @@ function mergeMessages(
     (first, second) =>
       new Date(first.created_at) -
       new Date(second.created_at),
+  );
+}
+
+
+function syncReplySnapshots(
+  messages,
+  changedMessage,
+) {
+  return messages.map(
+    (message) => {
+      if (
+        message.reply_to !==
+        changedMessage.id
+      ) {
+        return message;
+      }
+
+      return {
+        ...message,
+        reply_to_message: {
+          id: changedMessage.id,
+          author_id:
+            changedMessage.author,
+          author_username:
+            changedMessage.author_username,
+          text:
+            changedMessage.is_deleted
+              ? null
+              : changedMessage.text,
+          is_deleted:
+            changedMessage.is_deleted,
+        },
+      };
+    },
   );
 }
 
@@ -102,10 +143,48 @@ function messageInitial(username) {
 }
 
 
+function findMentionAtCursor(
+  text,
+  cursorPosition,
+) {
+  const beforeCursor =
+    text.slice(
+      0,
+      cursorPosition,
+    );
+
+  const match =
+    beforeCursor.match(
+      /(^|\s)@([A-Za-z0-9_.+-]*)$/,
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  const prefix =
+    match[1] ?? "";
+
+  const query =
+    match[2] ?? "";
+
+  const start =
+    match.index +
+    prefix.length;
+
+  return {
+    start,
+    end: cursorPosition,
+    query,
+  };
+}
+
+
 function ChannelChat({
   channel,
   workspace,
   user,
+  activityControls,
 }) {
   const [messages, setMessages] =
     useState([]);
@@ -143,6 +222,26 @@ function ChannelChat({
   ] = useState(null);
 
   const [
+    workspaceMembers,
+    setWorkspaceMembers,
+  ] = useState([]);
+
+  const [
+    selectedProfileMember,
+    setSelectedProfileMember,
+  ] = useState(null);
+
+  const [
+    mentionState,
+    setMentionState,
+  ] = useState(null);
+
+  const [
+    mentionActiveIndex,
+    setMentionActiveIndex,
+  ] = useState(0);
+
+  const [
     typingUsers,
     setTypingUsers,
   ] = useState([]);
@@ -160,6 +259,16 @@ function ChannelChat({
     setPendingDeleteMessageId,
   ] = useState(null);
 
+  const [
+    replyTarget,
+    setReplyTarget,
+  ] = useState(null);
+
+  const [
+    highlightedMessageId,
+    setHighlightedMessageId,
+  ] = useState(null);
+
   const socketRef =
     useRef(null);
 
@@ -175,11 +284,51 @@ function ChannelChat({
   const typingActiveRef =
     useRef(false);
 
+  const highlightTimerRef =
+    useRef(null);
+
   const bottomRef =
     useRef(null);
 
   const shouldScrollRef =
     useRef(true);
+
+  const composerRef =
+    useRef(null);
+
+
+  const filteredMentionMembers =
+    useMemo(
+      () => {
+        if (!mentionState) {
+          return [];
+        }
+
+        const query =
+          mentionState.query
+            .toLowerCase();
+
+        return workspaceMembers.filter(
+          (member) => {
+            if (
+              member.user_id ===
+              user.id
+            ) {
+              return false;
+            }
+
+            return member.username
+              .toLowerCase()
+              .startsWith(query);
+          },
+        );
+      },
+      [
+        mentionState,
+        workspaceMembers,
+        user.id,
+      ],
+    );
 
 
   const sendSocketEvent =
@@ -302,7 +451,7 @@ function ChannelChat({
     );
 
 
-  const loadWorkspaceRole =
+  const loadWorkspaceMembers =
     useCallback(
       async () => {
         const response =
@@ -314,13 +463,17 @@ function ChannelChat({
           throw new Error(
             await readApiError(
               response,
-              "Unable to load workspace role.",
+              "Unable to load workspace members.",
             ),
           );
         }
 
         const members =
           await response.json();
+
+        setWorkspaceMembers(
+          members,
+        );
 
         const membership =
           members.find(
@@ -402,7 +555,9 @@ function ChannelChat({
               channel.id,
             );
         } catch (connectionError) {
-          setSocketStatus("error");
+          setSocketStatus(
+            "error",
+          );
 
           setChatError(
             connectionError.message,
@@ -451,18 +606,30 @@ function ChannelChat({
             payload.type ===
               "message.deleted"
           ) {
+            const changedMessage =
+              normalizeMessage(
+                payload.data,
+              );
+
             shouldScrollRef.current =
               payload.type ===
               "message.created";
 
             setMessages(
-              (currentMessages) =>
-                mergeMessages(
-                  currentMessages,
-                  [
-                    payload.data,
-                  ],
-                ),
+              (currentMessages) => {
+                const merged =
+                  mergeMessages(
+                    currentMessages,
+                    [
+                      changedMessage,
+                    ],
+                  );
+
+                return syncReplySnapshots(
+                  merged,
+                  changedMessage,
+                );
+              },
             );
 
             if (
@@ -472,9 +639,17 @@ function ChannelChat({
               setPendingDeleteMessageId(
                 (currentId) =>
                   currentId ===
-                  payload.data.id
+                  changedMessage.id
                     ? null
                     : currentId,
+              );
+
+              setReplyTarget(
+                (currentReplyTarget) =>
+                  currentReplyTarget?.id ===
+                  changedMessage.id
+                    ? null
+                    : currentReplyTarget,
               );
             }
 
@@ -622,8 +797,15 @@ function ChannelChat({
     setChatError("");
     setTypingUsers([]);
     setWorkspaceRole(null);
+    setWorkspaceMembers([]);
     setEditingMessageId(null);
     setEditText("");
+    setMentionState(null);
+    setMentionActiveIndex(0);
+    setSelectedProfileMember(null);
+    setReplyTarget(null);
+    setHighlightedMessageId(null);
+
     setPendingDeleteMessageId(
       null,
     );
@@ -644,7 +826,7 @@ function ChannelChat({
 
         await Promise.all([
           loadHistory(),
-          loadWorkspaceRole(),
+          loadWorkspaceMembers(),
         ]);
 
         if (cancelled) {
@@ -701,6 +883,17 @@ function ChannelChat({
           null;
       }
 
+      if (
+        highlightTimerRef.current
+      ) {
+        window.clearTimeout(
+          highlightTimerRef.current,
+        );
+
+        highlightTimerRef.current =
+          null;
+      }
+
       typingActiveRef.current =
         false;
 
@@ -716,7 +909,7 @@ function ChannelChat({
     connectSocket,
     ensureMembership,
     loadHistory,
-    loadWorkspaceRole,
+    loadWorkspaceMembers,
   ]);
 
 
@@ -735,6 +928,21 @@ function ChannelChat({
     shouldScrollRef.current =
       false;
   }, [messages]);
+
+
+  useEffect(() => {
+    if (
+      mentionActiveIndex <
+      filteredMentionMembers.length
+    ) {
+      return;
+    }
+
+    setMentionActiveIndex(0);
+  }, [
+    filteredMentionMembers.length,
+    mentionActiveIndex,
+  ]);
 
 
   async function loadOlderMessages() {
@@ -792,13 +1000,40 @@ function ChannelChat({
   }
 
 
+  function updateMentionState(
+    value,
+    cursorPosition,
+  ) {
+    const nextMentionState =
+      findMentionAtCursor(
+        value,
+        cursorPosition,
+      );
+
+    setMentionState(
+      nextMentionState,
+    );
+
+    setMentionActiveIndex(0);
+  }
+
+
   function handleComposerChange(
     event,
   ) {
     const value =
       event.target.value;
 
+    const cursorPosition =
+      event.target.selectionStart ??
+      value.length;
+
     setComposer(value);
+
+    updateMentionState(
+      value,
+      cursorPosition,
+    );
 
     if (
       socketStatus !==
@@ -841,6 +1076,56 @@ function ChannelChat({
   }
 
 
+  function selectMention(member) {
+    if (!mentionState) {
+      return;
+    }
+
+    const beforeMention =
+      composer.slice(
+        0,
+        mentionState.start,
+      );
+
+    const afterMention =
+      composer.slice(
+        mentionState.end,
+      );
+
+    const insertedMention =
+      `@${member.username} `;
+
+    const nextComposer =
+      beforeMention +
+      insertedMention +
+      afterMention;
+
+    const nextCursorPosition =
+      beforeMention.length +
+      insertedMention.length;
+
+    setComposer(
+      nextComposer,
+    );
+
+    setMentionState(null);
+    setMentionActiveIndex(0);
+
+    window.requestAnimationFrame(
+      () => {
+        composerRef.current
+          ?.focus();
+
+        composerRef.current
+          ?.setSelectionRange(
+            nextCursorPosition,
+            nextCursorPosition,
+          );
+      },
+    );
+  }
+
+
   function sendMessage() {
     const text =
       composer.trim();
@@ -849,12 +1134,19 @@ function ChannelChat({
       return;
     }
 
+    const data = {
+      text,
+    };
+
+    if (replyTarget) {
+      data.reply_to_id =
+        replyTarget.id;
+    }
+
     if (
       !sendSocketEvent(
         "message.create",
-        {
-          text,
-        },
+        data,
       )
     ) {
       setChatError(
@@ -870,6 +1162,8 @@ function ChannelChat({
     stopTyping();
 
     setComposer("");
+    setMentionState(null);
+    setReplyTarget(null);
 
     shouldScrollRef.current =
       true;
@@ -894,6 +1188,84 @@ function ChannelChat({
     event,
   ) {
     if (
+      mentionState &&
+      filteredMentionMembers.length >
+        0
+    ) {
+      if (
+        event.key ===
+        "ArrowDown"
+      ) {
+        event.preventDefault();
+
+        setMentionActiveIndex(
+          (currentIndex) =>
+            (
+              currentIndex + 1
+            ) %
+            filteredMentionMembers.length,
+        );
+
+        return;
+      }
+
+      if (
+        event.key ===
+        "ArrowUp"
+      ) {
+        event.preventDefault();
+
+        setMentionActiveIndex(
+          (currentIndex) =>
+            (
+              currentIndex -
+              1 +
+              filteredMentionMembers.length
+            ) %
+            filteredMentionMembers.length,
+        );
+
+        return;
+      }
+
+      if (
+        event.key === "Enter" ||
+        event.key === "Tab"
+      ) {
+        event.preventDefault();
+
+        selectMention(
+          filteredMentionMembers[
+            mentionActiveIndex
+          ],
+        );
+
+        return;
+      }
+
+      if (
+        event.key === "Escape"
+      ) {
+        event.preventDefault();
+
+        setMentionState(null);
+
+        return;
+      }
+    }
+
+    if (
+      event.key === "Escape" &&
+      replyTarget
+    ) {
+      event.preventDefault();
+
+      setReplyTarget(null);
+
+      return;
+    }
+
+    if (
       event.key === "Enter" &&
       !event.shiftKey
     ) {
@@ -904,7 +1276,99 @@ function ChannelChat({
   }
 
 
+  function handleComposerClick(
+    event,
+  ) {
+    const cursorPosition =
+      event.currentTarget
+        .selectionStart ??
+      composer.length;
+
+    updateMentionState(
+      composer,
+      cursorPosition,
+    );
+  }
+
+
+  function startReply(message) {
+    if (message.is_deleted) {
+      return;
+    }
+
+    setEditingMessageId(null);
+    setEditText("");
+    setPendingDeleteMessageId(
+      null,
+    );
+
+    setReplyTarget({
+      id: message.id,
+      author:
+        message.author,
+      author_username:
+        message.author_username,
+      text: message.text,
+    });
+
+    window.requestAnimationFrame(
+      () => {
+        composerRef.current
+          ?.focus();
+      },
+    );
+  }
+
+
+  function cancelReply() {
+    setReplyTarget(null);
+  }
+
+
+  function scrollToMessage(
+    messageId,
+  ) {
+    const element =
+      document.querySelector(
+        `[data-message-id="${messageId}"]`,
+      );
+
+    if (!element) {
+      return;
+    }
+
+    element.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    setHighlightedMessageId(
+      messageId,
+    );
+
+    if (
+      highlightTimerRef.current
+    ) {
+      window.clearTimeout(
+        highlightTimerRef.current,
+      );
+    }
+
+    highlightTimerRef.current =
+      window.setTimeout(
+        () => {
+          setHighlightedMessageId(
+            null,
+          );
+        },
+        1500,
+      );
+  }
+
+
   function startEditing(message) {
+    setReplyTarget(null);
+
     setPendingDeleteMessageId(
       null,
     );
@@ -986,6 +1450,13 @@ function ChannelChat({
     setEditingMessageId(null);
     setEditText("");
 
+    if (
+      replyTarget?.id ===
+      messageId
+    ) {
+      setReplyTarget(null);
+    }
+
     setPendingDeleteMessageId(
       messageId,
     );
@@ -1044,6 +1515,91 @@ function ChannelChat({
   }
 
 
+  function openMentionProfile(
+    username,
+  ) {
+    const member =
+      workspaceMembers.find(
+        (workspaceMember) =>
+          workspaceMember.username
+            .toLowerCase() ===
+          username.toLowerCase(),
+      );
+
+    if (!member) {
+      return;
+    }
+
+    setSelectedProfileMember(
+      member,
+    );
+  }
+
+
+  function renderMessageText(text) {
+    if (!text) {
+      return null;
+    }
+
+    const parts =
+      text.split(
+        /(@[A-Za-z0-9_.+-]+)/g,
+      );
+
+    return parts.map(
+      (part, index) => {
+        if (
+          !part.startsWith("@")
+        ) {
+          return (
+            <span
+              key={`text-${index}`}
+            >
+              {part}
+            </span>
+          );
+        }
+
+        const username =
+          part.slice(1);
+
+        const member =
+          workspaceMembers.find(
+            (workspaceMember) =>
+              workspaceMember.username
+                .toLowerCase() ===
+              username.toLowerCase(),
+          );
+
+        if (!member) {
+          return (
+            <span
+              key={`mention-${index}`}
+            >
+              {part}
+            </span>
+          );
+        }
+
+        return (
+          <button
+            className="message-mention"
+            type="button"
+            key={`mention-${index}`}
+            onClick={() =>
+              openMentionProfile(
+                member.username,
+              )
+            }
+          >
+            @{member.username}
+          </button>
+        );
+      },
+    );
+  }
+
+
   const visibleTypingUsers =
     typingUsers.slice(0, 3);
 
@@ -1080,6 +1636,8 @@ function ChannelChat({
         </div>
 
         <div className="channel-header-actions">
+          {activityControls}
+
           <span
             className={[
               "socket-status",
@@ -1210,6 +1768,10 @@ function ChannelChat({
                     pendingDeleteMessageId ===
                     message.id;
 
+                  const isHighlighted =
+                    highlightedMessageId ===
+                    message.id;
+
                   return (
                     <article
                       className={[
@@ -1220,10 +1782,16 @@ function ChannelChat({
                         message.is_deleted
                           ? "deleted"
                           : "",
+                        isHighlighted
+                          ? "reply-highlight"
+                          : "",
                       ]
                         .filter(Boolean)
                         .join(" ")}
                       key={
+                        message.id
+                      }
+                      data-message-id={
                         message.id
                       }
                     >
@@ -1234,6 +1802,42 @@ function ChannelChat({
                       </div>
 
                       <div className="message-content">
+                        {message.reply_to_message && (
+                          <button
+                            className="message-reply-reference"
+                            type="button"
+                            onClick={() =>
+                              scrollToMessage(
+                                message.reply_to_message.id,
+                              )
+                            }
+                          >
+                            <span className="reply-reference-line" />
+
+                            <span className="reply-reference-avatar">
+                              {messageInitial(
+                                message.reply_to_message
+                                  .author_username,
+                              )}
+                            </span>
+
+                            <strong>
+                              {
+                                message.reply_to_message
+                                  .author_username
+                              }
+                            </strong>
+
+                            <span className="reply-reference-text">
+                              {message.reply_to_message
+                                .is_deleted
+                                ? "Message deleted"
+                                : message.reply_to_message
+                                    .text}
+                            </span>
+                          </button>
+                        )}
+
                         <div className="message-meta">
                           <strong>
                             {
@@ -1330,7 +1934,9 @@ function ChannelChat({
                           </div>
                         ) : (
                           <p className="message-text">
-                            {message.text}
+                            {renderMessageText(
+                              message.text,
+                            )}
                           </p>
                         )}
                       </div>
@@ -1338,38 +1944,52 @@ function ChannelChat({
                       {!message.is_deleted &&
                         !isEditing && (
                           <div className="message-actions">
-                            {isOwn &&
-                              !isDeletePending && (
+                            {!isDeletePending && (
                               <button
                                 type="button"
-                                title="Edit message"
+                                title="Reply to message"
                                 onClick={() =>
-                                  startEditing(
+                                  startReply(
                                     message,
                                   )
                                 }
                               >
-                                Edit
+                                Reply
                               </button>
                             )}
+
+                            {isOwn &&
+                              !isDeletePending && (
+                                <button
+                                  type="button"
+                                  title="Edit message"
+                                  onClick={() =>
+                                    startEditing(
+                                      message,
+                                    )
+                                  }
+                                >
+                                  Edit
+                                </button>
+                              )}
 
                             {canDeleteMessage(
                               message,
                             ) &&
                               !isDeletePending && (
-                              <button
-                                className="danger"
-                                type="button"
-                                title="Delete message"
-                                onClick={() =>
-                                  requestDeleteMessage(
-                                    message.id,
-                                  )
-                                }
-                              >
-                                Delete
-                              </button>
-                            )}
+                                <button
+                                  className="danger"
+                                  type="button"
+                                  title="Delete message"
+                                  onClick={() =>
+                                    requestDeleteMessage(
+                                      message.id,
+                                    )
+                                  }
+                                >
+                                  Delete
+                                </button>
+                              )}
 
                             {isDeletePending && (
                               <div className="message-delete-confirm">
@@ -1417,67 +2037,67 @@ function ChannelChat({
       <div className="typing-indicator-row">
         {typingUsers.length >
           0 && (
-          <div className="typing-indicator">
-            <span className="typing-dots">
-              <i />
-              <i />
-              <i />
-            </span>
+            <div className="typing-indicator">
+              <span className="typing-dots">
+                <i />
+                <i />
+                <i />
+              </span>
 
-            <div className="typing-users-list">
-              {visibleTypingUsers.map(
-                (
-                  typingUser,
-                  index,
-                ) => (
-                  <span
-                    className="typing-user"
-                    key={
-                      typingUser.user_id
-                    }
-                  >
-                    <strong>
-                      {
-                        typingUser.username
+              <div className="typing-users-list">
+                {visibleTypingUsers.map(
+                  (
+                    typingUser,
+                    index,
+                  ) => (
+                    <span
+                      className="typing-user"
+                      key={
+                        typingUser.user_id
                       }
-                    </strong>
+                    >
+                      <strong>
+                        {
+                          typingUser.username
+                        }
+                      </strong>
 
-                    {" is typing..."}
+                      {" is typing..."}
 
-                    {(
-                      index <
-                        visibleTypingUsers.length -
-                          1 ||
-                      hiddenTypingCount >
-                        0
-                    ) && (
-                      <b>
-                        /
-                      </b>
-                    )}
-                  </span>
-                ),
-              )}
+                      {(
+                        index <
+                          visibleTypingUsers.length -
+                            1 ||
+                        hiddenTypingCount >
+                          0
+                      ) && (
+                        <b>
+                          /
+                        </b>
+                      )}
+                    </span>
+                  ),
+                )}
 
-              {hiddenTypingCount >
-                0 && (
-                <span className="typing-user typing-more">
-                  <strong>
-                    +
-                    {
-                      hiddenTypingCount
-                    }
-                  </strong>
+                {hiddenTypingCount >
+                  0 && (
+                    <span className="typing-user typing-more">
+                      <strong>
+                        +
+                        {
+                          hiddenTypingCount
+                        }
+                      </strong>
 
-                  {hiddenTypingCount ===
-                  1
-                    ? " member is typing..."
-                    : " members are typing..."}
-                </span>
-              )}
+                      {hiddenTypingCount ===
+                      1
+                        ? " member is typing..."
+                        : " members are typing..."}
+                    </span>
+                  )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       {chatError && (
@@ -1502,7 +2122,106 @@ function ChannelChat({
         className="message-composer"
         onSubmit={handleSubmit}
       >
+        {mentionState && (
+          <div className="mention-suggestions">
+            <div className="mention-suggestions-header">
+              Members
+            </div>
+
+            {filteredMentionMembers.length >
+            0 ? (
+              filteredMentionMembers.map(
+                (
+                  member,
+                  index,
+                ) => (
+                  <button
+                    className={[
+                      "mention-suggestion",
+                      index ===
+                      mentionActiveIndex
+                        ? "active"
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    type="button"
+                    key={
+                      member.user_id
+                    }
+                    onMouseDown={(
+                      event,
+                    ) => {
+                      event.preventDefault();
+
+                      selectMention(
+                        member,
+                      );
+                    }}
+                  >
+                    <span className="mention-suggestion-avatar">
+                      {messageInitial(
+                        member.username,
+                      )}
+                    </span>
+
+                    <span className="mention-suggestion-copy">
+                      <strong>
+                        {member.username}
+                      </strong>
+
+                      <span>
+                        {member.email}
+                      </span>
+                    </span>
+                  </button>
+                ),
+              )
+            ) : (
+              <div className="mention-suggestions-empty">
+                No matching members.
+              </div>
+            )}
+          </div>
+        )}
+
+        {replyTarget && (
+          <div className="composer-reply-preview">
+            <div className="composer-reply-icon">
+              ↪
+            </div>
+
+            <div className="composer-reply-copy">
+              <span>
+                Replying to{" "}
+                <strong>
+                  {
+                    replyTarget.author_username
+                  }
+                </strong>
+              </span>
+
+              <p>
+                {replyTarget.text}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="composer-reply-close"
+              title="Cancel reply"
+              aria-label="Cancel reply"
+              onClick={
+                cancelReply
+              }
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         <textarea
+          ref={composerRef}
           value={composer}
           onChange={
             handleComposerChange
@@ -1510,7 +2229,39 @@ function ChannelChat({
           onKeyDown={
             handleComposerKeyDown
           }
-          placeholder={`Message #${channel.name}`}
+          onClick={
+            handleComposerClick
+          }
+          onKeyUp={(event) => {
+            if (
+              [
+                "ArrowUp",
+                "ArrowDown",
+                "Enter",
+                "Tab",
+                "Escape",
+              ].includes(
+                event.key,
+              )
+            ) {
+              return;
+            }
+
+            const cursorPosition =
+              event.currentTarget
+                .selectionStart ??
+              composer.length;
+
+            updateMentionState(
+              composer,
+              cursorPosition,
+            );
+          }}
+          placeholder={
+            replyTarget
+              ? `Reply to ${replyTarget.author_username}`
+              : `Message #${channel.name}`
+          }
           rows={1}
           disabled={
             socketStatus !==
@@ -1522,6 +2273,8 @@ function ChannelChat({
           <span>
             Enter to send ·
             Shift + Enter for new line
+            {replyTarget &&
+              " · Esc to cancel reply"}
           </span>
 
           <button
@@ -1537,6 +2290,17 @@ function ChannelChat({
           </button>
         </div>
       </form>
+
+      <MemberProfilePopover
+        member={
+          selectedProfileMember
+        }
+        onClose={() =>
+          setSelectedProfileMember(
+            null,
+          )
+        }
+      />
     </>
   );
 }

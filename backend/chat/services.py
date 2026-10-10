@@ -202,16 +202,30 @@ def create_mention_notifications(*, message):
 
 
 @transaction.atomic
-def create_message(*, channel, author, text):
+def create_message(
+    *,
+    channel,
+    author,
+    text,
+    reply_to=None,
+):
     if not ChannelMembership.objects.filter(
         channel=channel,
         user=author,
     ).exists():
         raise ValueError("User must be a channel member to send messages.")
 
+    if reply_to is not None:
+        if reply_to.channel_id != channel.id:
+            raise ValueError("Reply target must belong to the same channel.")
+
+        if reply_to.is_deleted:
+            raise ValueError("Deleted messages cannot be replied to.")
+
     message = Message.objects.create(
         channel=channel,
         author=author,
+        reply_to=reply_to,
         text=text,
     )
 

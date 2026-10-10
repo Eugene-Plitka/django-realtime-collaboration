@@ -1793,3 +1793,160 @@ class ChannelWebSocketTests(TransactionTestCase):
         self.assertEqual(before, after)
 
         await communicator.disconnect()
+
+        async def test_member_can_reply_to_message_via_websocket(self):
+            original_message = await create_test_message(
+                channel=self.channel,
+                author=self.second_member,
+                text="Original message",
+            )
+
+            communicator = WebsocketCommunicator(
+                application,
+                f"/ws/channels/{self.channel.id}/",
+                subprotocols=[f"jwt.{self.member_token}"],
+            )
+
+            connected, _ = await communicator.connect()
+
+            self.assertTrue(connected)
+
+            await communicator.send_json_to(
+                {
+                    "type": "message.create",
+                    "data": {
+                        "text": "Reply message",
+                        "reply_to_id": original_message.id,
+                    },
+                }
+            )
+
+            response = await communicator.receive_json_from()
+
+            self.assertEqual(
+                response["type"],
+                "message.created",
+            )
+
+            self.assertEqual(
+                response["data"]["text"],
+                "Reply message",
+            )
+
+            self.assertEqual(
+                response["data"]["reply_to"],
+                original_message.id,
+            )
+
+            self.assertEqual(
+                response["data"]["reply_to_message"]["id"],
+                original_message.id,
+            )
+
+            self.assertEqual(
+                response["data"]["reply_to_message"]["text"],
+                "Original message",
+            )
+
+            self.assertEqual(
+                response["data"]["reply_to_message"]["author_username"],
+                self.second_member.username,
+            )
+
+            await communicator.disconnect()
+
+        async def test_reply_to_nonexistent_message_is_rejected(self):
+            communicator = WebsocketCommunicator(
+                application,
+                f"/ws/channels/{self.channel.id}/",
+                subprotocols=[f"jwt.{self.member_token}"],
+            )
+
+            connected, _ = await communicator.connect()
+
+            self.assertTrue(connected)
+
+            await communicator.send_json_to(
+                {
+                    "type": "message.create",
+                    "data": {
+                        "text": "Reply",
+                        "reply_to_id": 999999,
+                    },
+                }
+            )
+
+            response = await communicator.receive_json_from()
+
+            self.assertEqual(
+                response["type"],
+                "error",
+            )
+
+            self.assertEqual(
+                response["data"]["code"],
+                "reply_message_not_found",
+            )
+
+            await communicator.disconnect()
+
+        async def test_reply_payload_is_broadcast_to_other_member(self):
+            original_message = await create_test_message(
+                channel=self.channel,
+                author=self.second_member,
+                text="Original broadcast",
+            )
+
+            sender = WebsocketCommunicator(
+                application,
+                f"/ws/channels/{self.channel.id}/",
+                subprotocols=[f"jwt.{self.member_token}"],
+            )
+
+            receiver = WebsocketCommunicator(
+                application,
+                f"/ws/channels/{self.channel.id}/",
+                subprotocols=[f"jwt.{self.second_member_token}"],
+            )
+
+            sender_connected, _ = await sender.connect()
+            receiver_connected, _ = await receiver.connect()
+
+            self.assertTrue(sender_connected)
+            self.assertTrue(receiver_connected)
+
+            await sender.send_json_to(
+                {
+                    "type": "message.create",
+                    "data": {
+                        "text": "Realtime reply",
+                        "reply_to_id": original_message.id,
+                    },
+                }
+            )
+
+            sender_response = await sender.receive_json_from()
+            receiver_response = await receiver.receive_json_from()
+
+            self.assertEqual(
+                sender_response["type"],
+                "message.created",
+            )
+
+            self.assertEqual(
+                receiver_response["type"],
+                "message.created",
+            )
+
+            self.assertEqual(
+                receiver_response["data"]["reply_to"],
+                original_message.id,
+            )
+
+            self.assertEqual(
+                receiver_response["data"]["reply_to_message"]["text"],
+                "Original broadcast",
+            )
+
+            await sender.disconnect()
+            await receiver.disconnect()

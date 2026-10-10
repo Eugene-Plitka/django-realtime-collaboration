@@ -77,6 +77,8 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    reply_to_message = serializers.SerializerMethodField()
+
     class Meta:
         model = Message
         fields = (
@@ -84,6 +86,8 @@ class MessageSerializer(serializers.ModelSerializer):
             "channel",
             "author",
             "author_username",
+            "reply_to",
+            "reply_to_message",
             "text",
             "created_at",
             "updated_at",
@@ -96,11 +100,27 @@ class MessageSerializer(serializers.ModelSerializer):
             "channel",
             "author",
             "author_username",
+            "reply_to",
+            "reply_to_message",
             "created_at",
             "updated_at",
             "edited_at",
             "is_deleted",
         )
+
+    def get_reply_to_message(self, instance):
+        if instance.reply_to_id is None:
+            return None
+
+        reply_to = instance.reply_to
+
+        return {
+            "id": reply_to.id,
+            "author_id": reply_to.author_id,
+            "author_username": reply_to.author.username,
+            "text": (None if reply_to.is_deleted else reply_to.text),
+            "is_deleted": reply_to.is_deleted,
+        }
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

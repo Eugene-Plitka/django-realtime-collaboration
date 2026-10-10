@@ -13,8 +13,7 @@ import { useAuth } from "../auth/AuthContext";
 import ChannelChat from "../components/ChannelChat";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
-import InvitationInbox from "../components/InvitationInbox";
-import NotificationsPanel from "../components/NotificationsPanel";
+import HeaderActivityControls from "../components/HeaderActivityControls";
 import WorkspaceMembersPanel from "../components/WorkspaceMembersPanel";
 import { useNotifications } from "../notifications/useNotifications";
 
@@ -61,8 +60,6 @@ function DashboardPage() {
       notificationsLoading,
     error:
       notificationsError,
-    socketStatus:
-      notificationSocketStatus,
     markRead,
     markUnread,
   } = useNotifications();
@@ -156,9 +153,10 @@ function DashboardPage() {
       setWorkspaceError("");
 
       try {
-        const response = await apiRequest(
-          "/api/workspaces/",
-        );
+        const response =
+          await apiRequest(
+            "/api/workspaces/",
+          );
 
         if (!response.ok) {
           throw new Error(
@@ -212,117 +210,120 @@ function DashboardPage() {
   );
 
 
-  const loadWorkspaceData = useCallback(
-    async (workspace) => {
-      if (!workspace) {
-        setChannels([]);
-        setActiveChannel(null);
-        setWorkspaceRole(null);
-        return;
-      }
-
-      setChannelsLoading(true);
-      setChannelError("");
-
-      try {
-        const [
-          channelsResponse,
-          membersResponse,
-        ] = await Promise.all([
-          apiRequest(
-            `/api/workspaces/${workspace.id}/channels/`,
-          ),
-          apiRequest(
-            `/api/workspaces/${workspace.id}/members/`,
-          ),
-        ]);
-
-        if (!channelsResponse.ok) {
-          throw new Error(
-            await readApiError(
-              channelsResponse,
-              "Unable to load channels.",
-            ),
-          );
+  const loadWorkspaceData =
+    useCallback(
+      async (workspace) => {
+        if (!workspace) {
+          setChannels([]);
+          setActiveChannel(null);
+          setWorkspaceRole(null);
+          return;
         }
 
-        if (!membersResponse.ok) {
-          throw new Error(
-            await readApiError(
-              membersResponse,
-              "Unable to load workspace membership.",
+        setChannelsLoading(true);
+        setChannelError("");
+
+        try {
+          const [
+            channelsResponse,
+            membersResponse,
+          ] = await Promise.all([
+            apiRequest(
+              `/api/workspaces/${workspace.id}/channels/`,
             ),
-          );
-        }
+            apiRequest(
+              `/api/workspaces/${workspace.id}/members/`,
+            ),
+          ]);
 
-        const [
-          channelData,
-          memberData,
-        ] = await Promise.all([
-          channelsResponse.json(),
-          membersResponse.json(),
-        ]);
-
-        const sortedChannels =
-          sortChannels(channelData);
-
-        setChannels(
-          sortedChannels,
-        );
-
-        const currentMembership =
-          memberData.find(
-            (membership) =>
-              membership.user_id ===
-              user.id,
-          );
-
-        setWorkspaceRole(
-          currentMembership?.role ??
-            null,
-        );
-
-        setActiveChannel(
-          (currentChannel) => {
-            if (
-              currentChannel &&
-              sortedChannels.some(
-                (channel) =>
-                  channel.id ===
-                  currentChannel.id,
-              )
-            ) {
-              return sortedChannels.find(
-                (channel) =>
-                  channel.id ===
-                  currentChannel.id,
-              );
-            }
-
-            return (
-              sortedChannels.find(
-                (channel) =>
-                  channel.is_general,
-              ) ??
-              sortedChannels[0] ??
-              null
+          if (!channelsResponse.ok) {
+            throw new Error(
+              await readApiError(
+                channelsResponse,
+                "Unable to load channels.",
+              ),
             );
-          },
-        );
-      } catch (requestError) {
-        setChannelError(
-          requestError.message,
-        );
+          }
 
-        setChannels([]);
-        setActiveChannel(null);
-        setWorkspaceRole(null);
-      } finally {
-        setChannelsLoading(false);
-      }
-    },
-    [user.id],
-  );
+          if (!membersResponse.ok) {
+            throw new Error(
+              await readApiError(
+                membersResponse,
+                "Unable to load workspace membership.",
+              ),
+            );
+          }
+
+          const [
+            channelData,
+            memberData,
+          ] = await Promise.all([
+            channelsResponse.json(),
+            membersResponse.json(),
+          ]);
+
+          const sortedChannels =
+            sortChannels(
+              channelData,
+            );
+
+          setChannels(
+            sortedChannels,
+          );
+
+          const currentMembership =
+            memberData.find(
+              (membership) =>
+                membership.user_id ===
+                user.id,
+            );
+
+          setWorkspaceRole(
+            currentMembership?.role ??
+              null,
+          );
+
+          setActiveChannel(
+            (currentChannel) => {
+              if (
+                currentChannel &&
+                sortedChannels.some(
+                  (channel) =>
+                    channel.id ===
+                    currentChannel.id,
+                )
+              ) {
+                return sortedChannels.find(
+                  (channel) =>
+                    channel.id ===
+                    currentChannel.id,
+                );
+              }
+
+              return (
+                sortedChannels.find(
+                  (channel) =>
+                    channel.is_general,
+                ) ??
+                sortedChannels[0] ??
+                null
+              );
+            },
+          );
+        } catch (requestError) {
+          setChannelError(
+            requestError.message,
+          );
+
+          setChannels([]);
+          setActiveChannel(null);
+          setWorkspaceRole(null);
+        } finally {
+          setChannelsLoading(false);
+        }
+      },
+      [user.id],
+    );
 
 
   useEffect(() => {
@@ -361,6 +362,8 @@ function DashboardPage() {
       setActiveChannel(
         targetChannel,
       );
+
+      setMainView("chat");
 
       setNotificationTargetChannelId(
         null,
@@ -451,17 +454,6 @@ function DashboardPage() {
     const payload =
       notification.payload ?? {};
 
-    if (
-      notification.type ===
-      "workspace_invitation"
-    ) {
-      setMainView(
-        "invitations",
-      );
-
-      return;
-    }
-
     const workspaceId =
       payload.workspace_id;
 
@@ -497,6 +489,32 @@ function DashboardPage() {
   }
 
 
+  const activityControls = (
+    <HeaderActivityControls
+      notifications={
+        notifications
+      }
+      unreadCount={
+        unreadCount
+      }
+      notificationsLoading={
+        notificationsLoading
+      }
+      notificationsError={
+        notificationsError
+      }
+      markRead={markRead}
+      markUnread={markUnread}
+      onOpenNotification={
+        handleOpenNotification
+      }
+      onInvitationAccepted={
+        handleInvitationAccepted
+      }
+    />
+  );
+
+
   return (
     <>
       <main className="dashboard-page channel-layout">
@@ -519,11 +537,7 @@ function DashboardPage() {
                     "workspace-item",
                     `workspace-tone-${index % 5}`,
                     activeWorkspace?.id ===
-                      workspace.id &&
-                    mainView !==
-                      "invitations" &&
-                    mainView !==
-                      "notifications"
+                      workspace.id
                       ? "active"
                       : "",
                   ]
@@ -531,7 +545,9 @@ function DashboardPage() {
                     .join(" ")}
                   type="button"
                   key={workspace.id}
-                  title={workspace.name}
+                  title={
+                    workspace.name
+                  }
                   onClick={() =>
                     selectWorkspace(
                       workspace,
@@ -545,58 +561,6 @@ function DashboardPage() {
               ),
             )}
           </div>
-
-          <button
-            className={[
-              "workspace-notification-button",
-              mainView ===
-              "notifications"
-                ? "active"
-                : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            type="button"
-            title="Notifications"
-            aria-label="Notifications"
-            onClick={() =>
-              setMainView(
-                "notifications",
-              )
-            }
-          >
-            N
-
-            {unreadCount > 0 && (
-              <span className="notification-badge">
-                {unreadCount > 99
-                  ? "99+"
-                  : unreadCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            className={[
-              "workspace-inbox-button",
-              mainView ===
-              "invitations"
-                ? "active"
-                : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            type="button"
-            title="Workspace invitations"
-            aria-label="Workspace invitations"
-            onClick={() =>
-              setMainView(
-                "invitations",
-              )
-            }
-          >
-            @
-          </button>
 
           <button
             className="workspace-add"
@@ -635,20 +599,20 @@ function DashboardPage() {
 
             {canManageChannels &&
               mainView === "chat" && (
-              <button
-                className="channel-create-icon"
-                type="button"
-                title="Create channel"
-                aria-label="Create channel"
-                onClick={() =>
-                  setCreateChannelModalOpen(
-                    true,
-                  )
-                }
-              >
-                +
-              </button>
-            )}
+                <button
+                  className="channel-create-icon"
+                  type="button"
+                  title="Create channel"
+                  aria-label="Create channel"
+                  onClick={() =>
+                    setCreateChannelModalOpen(
+                      true,
+                    )
+                  }
+                >
+                  +
+                </button>
+              )}
           </div>
 
           {activeWorkspace && (
@@ -762,18 +726,24 @@ function DashboardPage() {
                                     .join(" ")}
                                   type="button"
                                   key={channel.id}
-                                  onClick={() =>
+                                  onClick={() => {
                                     setActiveChannel(
                                       channel,
-                                    )
-                                  }
+                                    );
+
+                                    setMainView(
+                                      "chat",
+                                    );
+                                  }}
                                 >
                                   <span className="channel-symbol">
                                     #
                                   </span>
 
                                   <span className="channel-name">
-                                    {channel.name}
+                                    {
+                                      channel.name
+                                    }
                                   </span>
 
                                   {channel.is_general && (
@@ -783,13 +753,6 @@ function DashboardPage() {
                                   )}
                                 </button>
                               ),
-                            )}
-
-                            {publicChannels.length ===
-                              0 && (
-                              <div className="channel-empty-copy">
-                                No public channels.
-                              </div>
                             )}
                           </div>
                         </div>
@@ -816,28 +779,27 @@ function DashboardPage() {
                                     .join(" ")}
                                   type="button"
                                   key={channel.id}
-                                  onClick={() =>
+                                  onClick={() => {
                                     setActiveChannel(
                                       channel,
-                                    )
-                                  }
+                                    );
+
+                                    setMainView(
+                                      "chat",
+                                    );
+                                  }}
                                 >
                                   <span className="channel-symbol private">
                                     🔒
                                   </span>
 
                                   <span className="channel-name">
-                                    {channel.name}
+                                    {
+                                      channel.name
+                                    }
                                   </span>
                                 </button>
                               ),
-                            )}
-
-                            {privateChannels.length ===
-                              0 && (
-                              <div className="channel-empty-copy">
-                                No private channels.
-                              </div>
                             )}
                           </div>
                         </div>
@@ -878,69 +840,30 @@ function DashboardPage() {
         </section>
 
         <section className="channel-content">
-          {mainView ===
-            "notifications" && (
-            <NotificationsPanel
-              notifications={
-                notifications
-              }
-              unreadCount={
-                unreadCount
-              }
-              loading={
-                notificationsLoading
-              }
-              error={
-                notificationsError
-              }
-              socketStatus={
-                notificationSocketStatus
-              }
-              onMarkRead={
-                markRead
-              }
-              onMarkUnread={
-                markUnread
-              }
-              onOpen={
-                handleOpenNotification
-              }
-            />
+          {mainView !== "chat" && (
+            <div className="standalone-activity-controls">
+              {activityControls}
+            </div>
           )}
 
-          {mainView ===
-            "invitations" && (
-            <InvitationInbox
-              onAccepted={
-                handleInvitationAccepted
-              }
-            />
-          )}
-
-          {mainView !==
-              "invitations" &&
-            mainView !==
-              "notifications" &&
-            workspacesLoading && (
-              <div className="workspace-state">
-                <div className="state-spinner" />
-
-                <h2>
-                  Loading workspaces
-                </h2>
-
-                <p>
-                  Fetching your team spaces
-                  from the server.
-                </p>
+          {!activeWorkspace &&
+            !workspacesLoading && (
+              <div className="standalone-activity-controls">
+                {activityControls}
               </div>
             )}
 
-          {mainView !==
-              "invitations" &&
-            mainView !==
-              "notifications" &&
-            !workspacesLoading &&
+          {workspacesLoading && (
+            <div className="workspace-state">
+              <div className="state-spinner" />
+
+              <h2>
+                Loading workspaces
+              </h2>
+            </div>
+          )}
+
+          {!workspacesLoading &&
             workspaceError && (
               <div className="workspace-state">
                 <div className="state-icon error">
@@ -958,18 +881,16 @@ function DashboardPage() {
                 <button
                   className="primary-button state-action"
                   type="button"
-                  onClick={loadWorkspaces}
+                  onClick={
+                    loadWorkspaces
+                  }
                 >
                   Try again
                 </button>
               </div>
             )}
 
-          {mainView !==
-              "invitations" &&
-            mainView !==
-              "notifications" &&
-            !workspacesLoading &&
+          {!workspacesLoading &&
             !workspaceError &&
             workspaces.length ===
               0 && (
@@ -983,9 +904,10 @@ function DashboardPage() {
                 </h2>
 
                 <p>
-                  Create a workspace or open
-                  your invitations using the
-                  @ button on the left.
+                  Create a workspace or
+                  accept an invitation
+                  from the top-right
+                  invitation icon.
                 </p>
 
                 <button
@@ -1021,13 +943,15 @@ function DashboardPage() {
             )}
 
           {mainView === "chat" &&
-            !workspacesLoading &&
-            !workspaceError &&
             activeWorkspace &&
             !channelsLoading &&
             !channelError &&
             !activeChannel && (
               <div className="workspace-state">
+                <div className="standalone-activity-controls">
+                  {activityControls}
+                </div>
+
                 <div className="state-icon">
                   #
                 </div>
@@ -1035,25 +959,6 @@ function DashboardPage() {
                 <h2>
                   No channels available
                 </h2>
-
-                <p>
-                  There are no channels you
-                  can access in this workspace.
-                </p>
-
-                {canManageChannels && (
-                  <button
-                    className="primary-button state-action"
-                    type="button"
-                    onClick={() =>
-                      setCreateChannelModalOpen(
-                        true,
-                      )
-                    }
-                  >
-                    Create channel
-                  </button>
-                )}
               </div>
             )}
 
@@ -1062,11 +967,16 @@ function DashboardPage() {
             activeChannel && (
               <ChannelChat
                 key={activeChannel.id}
-                channel={activeChannel}
+                channel={
+                  activeChannel
+                }
                 workspace={
                   activeWorkspace
                 }
                 user={user}
+                activityControls={
+                  activityControls
+                }
               />
             )}
         </section>

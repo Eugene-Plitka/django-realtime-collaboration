@@ -86,6 +86,14 @@ class Message(models.Model):
         related_name="messages",
     )
 
+    reply_to = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="replies",
+    )
+
     text = models.TextField()
 
     created_at = models.DateTimeField(auto_now_add=True)

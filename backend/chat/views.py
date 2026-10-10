@@ -424,9 +424,9 @@ class MessageListView(generics.ListAPIView):
 
     def get_queryset(self):
         try:
-            channel = Channel.objects.select_related("workspace").get(
-                pk=self.kwargs["channel_id"]
-            )
+            channel = Channel.objects.select_related(
+                "workspace",
+            ).get(pk=self.kwargs["channel_id"])
         except Channel.DoesNotExist:
             raise NotFound()
 
@@ -446,7 +446,13 @@ class MessageListView(generics.ListAPIView):
             raise NotFound()
 
         return (
-            Message.objects.filter(channel=channel)
-            .select_related("author")
+            Message.objects.filter(
+                channel=channel,
+            )
+            .select_related(
+                "author",
+                "reply_to",
+                "reply_to__author",
+            )
             .order_by("-created_at")
         )

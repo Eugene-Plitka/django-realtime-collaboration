@@ -2,7 +2,11 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from workspaces.models import WorkspaceMembership
 
-from .models import Channel, ChannelMembership, Message
+from .models import (
+    Channel,
+    ChannelMembership,
+    Message,
+)
 from .permissions import (
     can_delete_message,
     can_edit_message,
@@ -14,12 +18,31 @@ from .services import (
 )
 
 
+def reply_to_data(message):
+    if message.reply_to_id is None:
+        return None
+
+    reply_to = message.reply_to
+
+    return {
+        "id": reply_to.id,
+        "author_id": reply_to.author_id,
+        "author_username": reply_to.author.username,
+        "text": (None if reply_to.is_deleted else reply_to.text),
+        "is_deleted": reply_to.is_deleted,
+    }
+
+
 def message_to_data(message):
     return {
         "id": message.id,
         "channel_id": message.channel_id,
         "author_id": message.author_id,
         "author_username": message.author.username,
+        "reply_to": message.reply_to_id,
+        "reply_to_message": reply_to_data(
+            message,
+        ),
         "text": (None if message.is_deleted else message.text),
         "created_at": message.created_at.isoformat(),
         "updated_at": message.updated_at.isoformat(),
@@ -29,7 +52,11 @@ def message_to_data(message):
 
 
 @database_sync_to_async
-def user_has_channel_access(*, channel_id, user):
+def user_has_channel_access(
+    *,
+    channel_id,
+    user,
+):
     if not user.is_authenticated:
         return False
 
@@ -41,16 +68,60 @@ def user_has_channel_access(*, channel_id, user):
 
 
 @database_sync_to_async
-def create_message_for_user(*, channel_id, user, text):
-    channel = Channel.objects.get(pk=channel_id)
-
-    message = create_message(
-        channel=channel,
-        author=user,
-        text=text,
+def create_message_for_user(
+    *,
+    channel_id,
+    user,
+    text,
+    reply_to_id=None,
+):
+    channel = Channel.objects.get(
+        pk=channel_id,
     )
 
-    return message_to_data(message)
+    reply_to = None
+
+    if reply_to_id is not None:
+        try:
+            reply_to = Message.objects.select_related(
+                "author",
+            ).get(
+                pk=reply_to_id,
+                channel_id=channel_id,
+            )
+        except Message.DoesNotExist:
+            return (
+                None,
+                "reply_message_not_found",
+            )
+
+    try:
+        message = create_message(
+            channel=channel,
+            author=user,
+            text=text,
+            reply_to=reply_to,
+        )
+    except ValueError:
+        return (
+            None,
+            "message_create_failed",
+        )
+
+    message = Message.objects.select_related(
+        "author",
+        "reply_to",
+        "reply_to__author",
+    ).get(
+        pk=message.pk,
+    )
+
+    return (
+        message_to_data(
+            message,
+        ),
+        None,
+    )
 
 
 @database_sync_to_async
@@ -65,25 +136,38 @@ def update_message_for_user(
         message = Message.objects.select_related(
             "author",
             "channel__workspace",
+            "reply_to",
+            "reply_to__author",
         ).get(
             pk=message_id,
             channel_id=channel_id,
         )
     except Message.DoesNotExist:
-        return None, "message_not_found"
+        return (
+            None,
+            "message_not_found",
+        )
 
     if not can_edit_message(
         message=message,
         user=user,
     ):
-        return None, "message_edit_forbidden"
+        return (
+            None,
+            "message_edit_forbidden",
+        )
 
     message = edit_message(
         message=message,
         text=text,
     )
 
-    return message_to_data(message), None
+    return (
+        message_to_data(
+            message,
+        ),
+        None,
+    )
 
 
 @database_sync_to_async
@@ -97,12 +181,17 @@ def delete_message_for_user(
         message = Message.objects.select_related(
             "author",
             "channel__workspace",
+            "reply_to",
+            "reply_to__author",
         ).get(
             pk=message_id,
             channel_id=channel_id,
         )
     except Message.DoesNotExist:
-        return None, "message_not_found"
+        return (
+            None,
+            "message_not_found",
+        )
 
     workspace_membership = WorkspaceMembership.objects.filter(
         workspace=message.channel.workspace,
@@ -110,20 +199,31 @@ def delete_message_for_user(
     ).first()
 
     if workspace_membership is None:
-        return None, "message_delete_forbidden"
+        return (
+            None,
+            "message_delete_forbidden",
+        )
 
     if not can_delete_message(
         message=message,
         workspace_membership=workspace_membership,
         user=user,
     ):
-        return None, "message_delete_forbidden"
+        return (
+            None,
+            "message_delete_forbidden",
+        )
 
     message = delete_message(
         message=message,
     )
 
-    return message_to_data(message), None
+    return (
+        message_to_data(
+            message,
+        ),
+        None,
+    )
 
 
 class ChannelConsumer(AsyncJsonWebsocketConsumer):
@@ -131,7 +231,9 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         user = self.scope["user"]
 
         if not user.is_authenticated:
-            await self.close(code=4401)
+            await self.close(
+                code=4401,
+            )
             return
 
         self.channel_id = self.scope["url_route"]["kwargs"]["channel_id"]
@@ -142,7 +244,9 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         )
 
         if not has_access:
-            await self.close(code=4403)
+            await self.close(
+                code=4403,
+            )
             return
 
         self.group_name = f"channel_{self.channel_id}"
@@ -152,29 +256,53 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             self.channel_name,
         )
 
-        await self.accept(subprotocol=self.scope.get("jwt_subprotocol"))
+        await self.accept(
+            subprotocol=self.scope.get("jwt_subprotocol"),
+        )
 
-    async def disconnect(self, close_code):
-        if hasattr(self, "group_name"):
+    async def disconnect(
+        self,
+        close_code,
+    ):
+        if hasattr(
+            self,
+            "group_name",
+        ):
             await self.channel_layer.group_discard(
                 self.group_name,
                 self.channel_name,
             )
 
-    async def receive_json(self, content, **kwargs):
-        event_type = content.get("type")
-        data = content.get("data", {})
+    async def receive_json(
+        self,
+        content,
+        **kwargs,
+    ):
+        event_type = content.get(
+            "type",
+        )
+
+        data = content.get(
+            "data",
+            {},
+        )
 
         if event_type == "message.create":
-            await self.handle_message_create(data)
+            await self.handle_message_create(
+                data,
+            )
             return
 
         if event_type == "message.update":
-            await self.handle_message_update(data)
+            await self.handle_message_update(
+                data,
+            )
             return
 
         if event_type == "message.delete":
-            await self.handle_message_delete(data)
+            await self.handle_message_delete(
+                data,
+            )
             return
 
         if event_type == "typing.start":
@@ -187,10 +315,13 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
 
         await self.send_error(
             code="unsupported_event",
-            message="Unsupported event type.",
+            message=("Unsupported event type."),
         )
 
-    async def handle_message_create(self, data):
+    async def handle_message_create(
+        self,
+        data,
+    ):
         user = self.scope["user"]
 
         has_access = await user_has_channel_access(
@@ -201,16 +332,23 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if not has_access:
             await self.send_error(
                 code="channel_access_denied",
-                message="You no longer have access to this channel.",
+                message=("You no longer have access to this channel."),
             )
             return
 
         text = data.get("text")
 
-        if not isinstance(text, str):
+        reply_to_id = data.get(
+            "reply_to_id",
+        )
+
+        if not isinstance(
+            text,
+            str,
+        ):
             await self.send_error(
                 code="invalid_message_text",
-                message="Message text must be a string.",
+                message=("Message text must be a string."),
             )
             return
 
@@ -219,20 +357,41 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if not text:
             await self.send_error(
                 code="invalid_message_text",
-                message="Message text cannot be empty.",
+                message=("Message text cannot be empty."),
+            )
+            return
+
+        if reply_to_id is not None and not isinstance(
+            reply_to_id,
+            int,
+        ):
+            await self.send_error(
+                code="invalid_reply_message_id",
+                message=("Reply message id must be an integer."),
             )
             return
 
         try:
-            message_data = await create_message_for_user(
+            (
+                message_data,
+                error,
+            ) = await create_message_for_user(
                 channel_id=self.channel_id,
                 user=user,
                 text=text,
+                reply_to_id=reply_to_id,
             )
-        except Channel.DoesNotExist, ValueError:
+        except Channel.DoesNotExist:
             await self.send_error(
                 code="message_create_failed",
-                message="Message could not be created.",
+                message=("Message could not be created."),
+            )
+            return
+
+        if error:
+            await self.send_error(
+                code=error,
+                message=("Message could not be created."),
             )
             return
 
@@ -244,7 +403,10 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             },
         )
 
-    async def message_created(self, event):
+    async def message_created(
+        self,
+        event,
+    ):
         await self.send_json(
             {
                 "type": "message.created",
@@ -252,7 +414,12 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             }
         )
 
-    async def send_error(self, *, code, message):
+    async def send_error(
+        self,
+        *,
+        code,
+        message,
+    ):
         await self.send_json(
             {
                 "type": "error",
@@ -263,7 +430,10 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             }
         )
 
-    async def handle_message_update(self, data):
+    async def handle_message_update(
+        self,
+        data,
+    ):
         user = self.scope["user"]
 
         has_access = await user_has_channel_access(
@@ -274,24 +444,35 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if not has_access:
             await self.send_error(
                 code="channel_access_denied",
-                message="You no longer have access to this channel.",
+                message=("You no longer have access to this channel."),
             )
             return
 
-        message_id = data.get("message_id")
-        text = data.get("text")
+        message_id = data.get(
+            "message_id",
+        )
 
-        if not isinstance(message_id, int):
+        text = data.get(
+            "text",
+        )
+
+        if not isinstance(
+            message_id,
+            int,
+        ):
             await self.send_error(
                 code="invalid_message_id",
-                message="Message id must be an integer.",
+                message=("Message id must be an integer."),
             )
             return
 
-        if not isinstance(text, str):
+        if not isinstance(
+            text,
+            str,
+        ):
             await self.send_error(
                 code="invalid_message_text",
-                message="Message text must be a string.",
+                message=("Message text must be a string."),
             )
             return
 
@@ -300,11 +481,14 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if not text:
             await self.send_error(
                 code="invalid_message_text",
-                message="Message text cannot be empty.",
+                message=("Message text cannot be empty."),
             )
             return
 
-        message_data, error = await update_message_for_user(
+        (
+            message_data,
+            error,
+        ) = await update_message_for_user(
             channel_id=self.channel_id,
             message_id=message_id,
             user=user,
@@ -314,7 +498,7 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if error:
             await self.send_error(
                 code=error,
-                message="Message could not be updated.",
+                message=("Message could not be updated."),
             )
             return
 
@@ -326,7 +510,10 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             },
         )
 
-    async def message_updated(self, event):
+    async def message_updated(
+        self,
+        event,
+    ):
         await self.send_json(
             {
                 "type": "message.updated",
@@ -334,7 +521,10 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             }
         )
 
-    async def handle_message_delete(self, data):
+    async def handle_message_delete(
+        self,
+        data,
+    ):
         user = self.scope["user"]
 
         has_access = await user_has_channel_access(
@@ -345,20 +535,28 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if not has_access:
             await self.send_error(
                 code="channel_access_denied",
-                message="You no longer have access to this channel.",
+                message=("You no longer have access to this channel."),
             )
             return
 
-        message_id = data.get("message_id")
+        message_id = data.get(
+            "message_id",
+        )
 
-        if not isinstance(message_id, int):
+        if not isinstance(
+            message_id,
+            int,
+        ):
             await self.send_error(
                 code="invalid_message_id",
-                message="Message id must be an integer.",
+                message=("Message id must be an integer."),
             )
             return
 
-        message_data, error = await delete_message_for_user(
+        (
+            message_data,
+            error,
+        ) = await delete_message_for_user(
             channel_id=self.channel_id,
             message_id=message_id,
             user=user,
@@ -367,7 +565,7 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if error:
             await self.send_error(
                 code=error,
-                message="Message could not be deleted.",
+                message=("Message could not be deleted."),
             )
             return
 
@@ -379,7 +577,10 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             },
         )
 
-    async def message_deleted(self, event):
+    async def message_deleted(
+        self,
+        event,
+    ):
         await self.send_json(
             {
                 "type": "message.deleted",
@@ -387,7 +588,9 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             }
         )
 
-    async def handle_typing_start(self):
+    async def handle_typing_start(
+        self,
+    ):
         user = self.scope["user"]
 
         has_access = await user_has_channel_access(
@@ -398,7 +601,7 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if not has_access:
             await self.send_error(
                 code="channel_access_denied",
-                message="You no longer have access to this channel.",
+                message=("You no longer have access to this channel."),
             )
             return
 
@@ -413,7 +616,9 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             },
         )
 
-    async def handle_typing_stop(self):
+    async def handle_typing_stop(
+        self,
+    ):
         user = self.scope["user"]
 
         has_access = await user_has_channel_access(
@@ -424,7 +629,7 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         if not has_access:
             await self.send_error(
                 code="channel_access_denied",
-                message="You no longer have access to this channel.",
+                message=("You no longer have access to this channel."),
             )
             return
 
@@ -439,7 +644,10 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             },
         )
 
-    async def typing_started(self, event):
+    async def typing_started(
+        self,
+        event,
+    ):
         if event["data"]["user_id"] == self.scope["user"].id:
             return
 
@@ -450,7 +658,10 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
             }
         )
 
-    async def typing_stopped(self, event):
+    async def typing_stopped(
+        self,
+        event,
+    ):
         if event["data"]["user_id"] == self.scope["user"].id:
             return
 
