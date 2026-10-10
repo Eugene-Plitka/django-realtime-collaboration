@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
 import {
   apiRequest,
@@ -60,7 +61,22 @@ function ChannelActionsMenu({
     setLeaving,
   ] = useState(false);
 
-  const rootRef = useRef(null);
+  const [
+    popupPosition,
+    setPopupPosition,
+  ] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  const rootRef =
+    useRef(null);
+
+  const triggerRef =
+    useRef(null);
+
+  const popupRef =
+    useRef(null);
 
 
   const canManageMembers =
@@ -108,85 +124,156 @@ function ChannelActionsMenu({
     );
 
 
-  const loadData = useCallback(
-    async () => {
-      setLoading(true);
-      setError("");
+  const updatePopupPosition =
+    useCallback(() => {
+      const trigger =
+        triggerRef.current;
 
-      try {
-        const [
-          channelMembersResponse,
-          workspaceMembersResponse,
-        ] = await Promise.all([
-          apiRequest(
-            `/api/channels/${channel.id}/members/`,
-          ),
-          apiRequest(
-            `/api/workspaces/${workspace.id}/members/`,
-          ),
-        ]);
-
-        if (
-          !channelMembersResponse.ok
-        ) {
-          throw new Error(
-            await readApiError(
-              channelMembersResponse,
-              "Unable to load channel members.",
-            ),
-          );
-        }
-
-        if (
-          !workspaceMembersResponse.ok
-        ) {
-          throw new Error(
-            await readApiError(
-              workspaceMembersResponse,
-              "Unable to load workspace members.",
-            ),
-          );
-        }
-
-        const [
-          channelMemberData,
-          workspaceMemberData,
-        ] = await Promise.all([
-          channelMembersResponse.json(),
-          workspaceMembersResponse.json(),
-        ]);
-
-        setChannelMembers(
-          channelMemberData,
-        );
-
-        setWorkspaceMembers(
-          workspaceMemberData,
-        );
-      } catch (requestError) {
-        setError(
-          requestError.message,
-        );
-      } finally {
-        setLoading(false);
+      if (!trigger) {
+        return;
       }
-    },
-    [
-      channel.id,
-      workspace.id,
-    ],
-  );
+
+      const rect =
+        trigger.getBoundingClientRect();
+
+      const popupWidth = 370;
+      const viewportPadding = 12;
+      const gap = 8;
+
+      let left =
+        rect.left;
+
+      if (
+        left +
+          popupWidth +
+          viewportPadding >
+        window.innerWidth
+      ) {
+        left =
+          window.innerWidth -
+          popupWidth -
+          viewportPadding;
+      }
+
+      left = Math.max(
+        viewportPadding,
+        left,
+      );
+
+      let top =
+        rect.bottom + gap;
+
+      const estimatedHeight = 430;
+
+      if (
+        top +
+          estimatedHeight +
+          viewportPadding >
+          window.innerHeight &&
+        rect.top >
+          estimatedHeight
+      ) {
+        top =
+          rect.top -
+          estimatedHeight -
+          gap;
+      }
+
+      setPopupPosition({
+        top,
+        left,
+      });
+    }, []);
+
+
+  const loadData =
+    useCallback(
+      async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+          const [
+            channelMembersResponse,
+            workspaceMembersResponse,
+          ] = await Promise.all([
+            apiRequest(
+              `/api/channels/${channel.id}/members/`,
+            ),
+            apiRequest(
+              `/api/workspaces/${workspace.id}/members/`,
+            ),
+          ]);
+
+          if (
+            !channelMembersResponse.ok
+          ) {
+            throw new Error(
+              await readApiError(
+                channelMembersResponse,
+                "Unable to load channel members.",
+              ),
+            );
+          }
+
+          if (
+            !workspaceMembersResponse.ok
+          ) {
+            throw new Error(
+              await readApiError(
+                workspaceMembersResponse,
+                "Unable to load workspace members.",
+              ),
+            );
+          }
+
+          const [
+            channelMemberData,
+            workspaceMemberData,
+          ] = await Promise.all([
+            channelMembersResponse.json(),
+            workspaceMembersResponse.json(),
+          ]);
+
+          setChannelMembers(
+            channelMemberData,
+          );
+
+          setWorkspaceMembers(
+            workspaceMemberData,
+          );
+        } catch (requestError) {
+          setError(
+            requestError.message,
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      [
+        channel.id,
+        workspace.id,
+      ],
+    );
 
 
   useEffect(() => {
     function handleOutsideClick(
       event,
     ) {
-      if (
-        rootRef.current &&
-        !rootRef.current.contains(
+      const clickedTrigger =
+        rootRef.current?.contains(
           event.target,
-        )
+        );
+
+      const clickedPopup =
+        popupRef.current?.contains(
+          event.target,
+        );
+
+      if (
+        !clickedTrigger &&
+        !clickedPopup
       ) {
         setOpen(false);
         setView("menu");
@@ -212,19 +299,62 @@ function ChannelActionsMenu({
       return;
     }
 
+    updatePopupPosition();
     loadData();
+
+    function handleViewportChange() {
+      updatePopupPosition();
+    }
+
+    window.addEventListener(
+      "resize",
+      handleViewportChange,
+    );
+
+    window.addEventListener(
+      "scroll",
+      handleViewportChange,
+      true,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        handleViewportChange,
+      );
+
+      window.removeEventListener(
+        "scroll",
+        handleViewportChange,
+        true,
+      );
+    };
   }, [
     open,
     loadData,
+    updatePopupPosition,
   ]);
 
 
-  function toggleMenu() {
+  function toggleMenu(event) {
+    event.stopPropagation();
+
+    if (!open) {
+      updatePopupPosition();
+    }
+
     setOpen(
       (currentOpen) =>
         !currentOpen,
     );
 
+    setView("menu");
+    setError("");
+  }
+
+
+  function closeMenu() {
+    setOpen(false);
     setView("menu");
     setError("");
   }
@@ -347,7 +477,7 @@ function ChannelActionsMenu({
         );
       }
 
-      setOpen(false);
+      closeMenu();
 
       await onLeftChannel(
         channel,
@@ -362,23 +492,18 @@ function ChannelActionsMenu({
   }
 
 
-  return (
-    <div
-      className="channel-actions-root"
-      ref={rootRef}
-    >
-      <button
-        className="channel-more-button"
-        type="button"
-        title="Channel actions"
-        aria-label="Channel actions"
-        onClick={toggleMenu}
-      >
-        •••
-      </button>
-
-      {open && (
-        <div className="channel-actions-popover">
+  const popup = open
+    ? createPortal(
+        <div
+          ref={popupRef}
+          className="channel-actions-popover channel-actions-portal"
+          style={{
+            top:
+              popupPosition.top,
+            left:
+              popupPosition.left,
+          }}
+        >
           {view === "menu" && (
             <>
               <div className="channel-actions-heading">
@@ -386,8 +511,8 @@ function ChannelActionsMenu({
                   <strong>
                     {channel.type ===
                     "PRIVATE"
-                      ? "🔒"
-                      : "#"}
+                      ? "🔒 "
+                      : "# "}
                     {channel.name}
                   </strong>
 
@@ -401,8 +526,8 @@ function ChannelActionsMenu({
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setOpen(false)
+                  onClick={
+                    closeMenu
                   }
                 >
                   ×
@@ -540,10 +665,10 @@ function ChannelActionsMenu({
 
                             {membership.user_id ===
                               user.id && (
-                              <small>
-                                you
-                              </small>
-                            )}
+                                <small>
+                                  you
+                                </small>
+                              )}
                           </strong>
 
                           <span>
@@ -678,9 +803,39 @@ function ChannelActionsMenu({
               )}
             </>
           )}
-        </div>
-      )}
-    </div>
+        </div>,
+        document.body,
+      )
+    : null;
+
+
+  return (
+    <>
+      <div
+        className={[
+          "channel-actions-root",
+          open
+            ? "open"
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        ref={rootRef}
+      >
+        <button
+          ref={triggerRef}
+          className="channel-more-button"
+          type="button"
+          title="Channel actions"
+          aria-label={`Actions for ${channel.name}`}
+          onClick={toggleMenu}
+        >
+          •••
+        </button>
+      </div>
+
+      {popup}
+    </>
   );
 }
 

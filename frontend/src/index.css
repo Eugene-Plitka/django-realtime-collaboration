@@ -5038,3 +5038,120 @@ button.cancel:hover {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* Channel actions moved to sidebar */
+
+.channel-header-actions
+> .channel-actions-root {
+  display: none;
+}
+
+
+.channel-list-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+
+.channel-list-row
+.channel-list-item {
+  flex: 1;
+  padding-right: 38px;
+}
+
+
+.channel-list-row
+.channel-actions-root {
+  position: absolute;
+  z-index: 25;
+  top: 50%;
+  right: 5px;
+  transform:
+    translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 120ms ease;
+}
+
+
+.channel-list-row:hover
+.channel-actions-root,
+.channel-list-row
+.channel-actions-root.open,
+.channel-list-row
+.channel-actions-root:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+
+.channel-list-row
+.channel-more-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #6e7c93;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+
+.channel-list-row
+.channel-more-button:hover,
+.channel-list-row
+.channel-actions-root.open
+.channel-more-button {
+  background: #202b40;
+  color: #d6dce8;
+}
+
+
+.channel-list-row
+.channel-general-badge {
+  margin-right: 2px;
+}
+
+
+.channel-actions-popover {
+  position: fixed;
+  z-index: 200;
+  width: 370px;
+  overflow: hidden;
+  border:
+    1px solid #2a384f;
+  border-radius: 13px;
+  background: #111a29;
+  box-shadow:
+    0 24px 65px
+    rgba(0, 0, 0, 0.48);
+  transform: none;
+}
+
+
+@media (max-width: 600px) {
+  .channel-actions-popover {
+    right: 12px;
+    left: 12px !important;
+    width: auto;
+  }
+}
+
+/* Channel actions portal fix */
+
+.channel-actions-portal {
+  position: fixed;
+  z-index: 9999;
+  right: auto;
+  bottom: auto;
+  margin: 0;
+  transform: none;
+}

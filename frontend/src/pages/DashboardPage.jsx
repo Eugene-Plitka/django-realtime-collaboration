@@ -10,6 +10,7 @@ import {
   readApiError,
 } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import ChannelActionsMenu from "../components/ChannelActionsMenu";
 import ChannelChat from "../components/ChannelChat";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
@@ -765,44 +766,60 @@ function DashboardPage() {
                           <div className="channel-list">
                             {publicChannels.map(
                               (channel) => (
-                                <button
-                                  className={[
-                                    "channel-list-item",
-                                    activeChannel?.id ===
-                                    channel.id
-                                      ? "active"
-                                      : "",
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                  type="button"
+                                <div
+                                  className="channel-list-row"
                                   key={channel.id}
-                                  onClick={() => {
-                                    setActiveChannel(
-                                      channel,
-                                    );
-
-                                    setMainView(
-                                      "chat",
-                                    );
-                                  }}
                                 >
-                                  <span className="channel-symbol">
-                                    #
-                                  </span>
+                                  <button
+                                    className={[
+                                      "channel-list-item",
+                                      activeChannel?.id ===
+                                      channel.id
+                                        ? "active"
+                                        : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ")}
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveChannel(
+                                        channel,
+                                      );
 
-                                  <span className="channel-name">
-                                    {
-                                      channel.name
-                                    }
-                                  </span>
-
-                                  {channel.is_general && (
-                                    <span className="channel-general-badge">
-                                      default
+                                      setMainView(
+                                        "chat",
+                                      );
+                                    }}
+                                  >
+                                    <span className="channel-symbol">
+                                      #
                                     </span>
-                                  )}
-                                </button>
+
+                                    <span className="channel-name">
+                                      {channel.name}
+                                    </span>
+
+                                    {channel.is_general && (
+                                      <span className="channel-general-badge">
+                                        default
+                                      </span>
+                                    )}
+                                  </button>
+
+                                  <ChannelActionsMenu
+                                    channel={channel}
+                                    workspace={
+                                      activeWorkspace
+                                    }
+                                    user={user}
+                                    workspaceRole={
+                                      workspaceRole
+                                    }
+                                    onLeftChannel={
+                                      handleLeftChannel
+                                    }
+                                  />
+                                </div>
                               ),
                             )}
                           </div>
@@ -818,38 +835,54 @@ function DashboardPage() {
                           <div className="channel-list">
                             {privateChannels.map(
                               (channel) => (
-                                <button
-                                  className={[
-                                    "channel-list-item",
-                                    activeChannel?.id ===
-                                    channel.id
-                                      ? "active"
-                                      : "",
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                  type="button"
+                                <div
+                                  className="channel-list-row"
                                   key={channel.id}
-                                  onClick={() => {
-                                    setActiveChannel(
-                                      channel,
-                                    );
-
-                                    setMainView(
-                                      "chat",
-                                    );
-                                  }}
                                 >
-                                  <span className="channel-symbol private">
-                                    🔒
-                                  </span>
+                                  <button
+                                    className={[
+                                      "channel-list-item",
+                                      activeChannel?.id ===
+                                      channel.id
+                                        ? "active"
+                                        : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ")}
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveChannel(
+                                        channel,
+                                      );
 
-                                  <span className="channel-name">
-                                    {
-                                      channel.name
+                                      setMainView(
+                                        "chat",
+                                      );
+                                    }}
+                                  >
+                                    <span className="channel-symbol private">
+                                      🔒
+                                    </span>
+
+                                    <span className="channel-name">
+                                      {channel.name}
+                                    </span>
+                                  </button>
+
+                                  <ChannelActionsMenu
+                                    channel={channel}
+                                    workspace={
+                                      activeWorkspace
                                     }
-                                  </span>
-                                </button>
+                                    user={user}
+                                    workspaceRole={
+                                      workspaceRole
+                                    }
+                                    onLeftChannel={
+                                      handleLeftChannel
+                                    }
+                                  />
+                                </div>
                               ),
                             )}
                           </div>
