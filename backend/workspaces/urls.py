@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    MyWorkspaceInvitationListView,
     WorkspaceDetailView,
     WorkspaceInvitationAcceptView,
     WorkspaceInvitationCancelView,
@@ -14,9 +15,28 @@ from .views import (
     WorkspaceTransferOwnershipView,
 )
 
+
 urlpatterns = [
-    path("", WorkspaceListCreateView.as_view(), name="workspace-list-create"),
-    path("<int:pk>/", WorkspaceDetailView.as_view(), name="workspace-detail"),
+    path(
+        "",
+        WorkspaceListCreateView.as_view(),
+        name="workspace-list-create",
+    ),
+    path(
+        "invitations/pending/",
+        MyWorkspaceInvitationListView.as_view(),
+        name="my-workspace-invitation-list",
+    ),
+    path(
+        "invitations/<uuid:token>/accept/",
+        WorkspaceInvitationAcceptView.as_view(),
+        name="workspace-invitation-accept",
+    ),
+    path(
+        "<int:pk>/",
+        WorkspaceDetailView.as_view(),
+        name="workspace-detail",
+    ),
     path(
         "<int:workspace_id>/members/",
         WorkspaceMemberListView.as_view(),
@@ -51,11 +71,6 @@ urlpatterns = [
         "<int:workspace_id>/invitations/",
         WorkspaceInvitationListCreateView.as_view(),
         name="workspace-invitation-list-create",
-    ),
-    path(
-        "invitations/<uuid:token>/accept/",
-        WorkspaceInvitationAcceptView.as_view(),
-        name="workspace-invitation-accept",
     ),
     path(
         "<int:workspace_id>/invitations/<int:invitation_id>/cancel/",

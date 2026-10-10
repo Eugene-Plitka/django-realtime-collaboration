@@ -87,6 +87,11 @@ class WorkspaceInvitationCreateSerializer(serializers.Serializer):
 
 
 class WorkspaceInvitationSerializer(serializers.ModelSerializer):
+    workspace_name = serializers.CharField(
+        source="workspace.name",
+        read_only=True,
+    )
+
     invited_by_username = serializers.CharField(
         source="invited_by.username",
         read_only=True,
@@ -96,6 +101,8 @@ class WorkspaceInvitationSerializer(serializers.ModelSerializer):
         model = WorkspaceInvitation
         fields = (
             "id",
+            "workspace",
+            "workspace_name",
             "email",
             "role",
             "status",

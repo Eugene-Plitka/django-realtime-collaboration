@@ -1,4 +1,5 @@
 from accounts.models import User
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -368,6 +369,25 @@ class WorkspaceInvitationAcceptView(generics.GenericAPIView):
         return Response(
             serializer.data,
             status=status.HTTP_201_CREATED,
+        )
+
+
+class MyWorkspaceInvitationListView(generics.ListAPIView):
+    serializer_class = WorkspaceInvitationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            WorkspaceInvitation.objects.filter(
+                email__iexact=self.request.user.email,
+                status=WorkspaceInvitation.Status.PENDING,
+                expires_at__gt=timezone.now(),
+            )
+            .select_related(
+                "workspace",
+                "invited_by",
+            )
+            .order_by("-created_at")
         )
 
 

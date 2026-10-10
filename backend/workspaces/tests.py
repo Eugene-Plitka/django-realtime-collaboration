@@ -1236,6 +1236,95 @@ class WorkspaceAPITests(APITestCase):
             status.HTTP_200_OK,
         )
 
+        def test_user_can_list_own_pending_invitations(self):
+            workspace = create_workspace(
+                name="Acme Development",
+                slug="acme-development",
+                user=self.user,
+            )
+
+            invited_user = User.objects.create_user(
+                email="member@example.com",
+                username="member",
+                password="StrongPassword123!",
+            )
+
+            invitation = create_workspace_invitation(
+                workspace=workspace,
+                email=invited_user.email,
+                invited_by=self.user,
+                role=WorkspaceMembership.Role.MEMBER,
+            )
+
+            self.client.force_authenticate(
+                user=invited_user,
+            )
+
+            response = self.client.get(
+                reverse(
+                    "my-workspace-invitation-list",
+                )
+            )
+
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_200_OK,
+            )
+
+            self.assertEqual(
+                len(response.data),
+                1,
+            )
+
+            self.assertEqual(
+                response.data[0]["id"],
+                invitation.id,
+            )
+
+            self.assertEqual(
+                response.data[0]["workspace"],
+                workspace.id,
+            )
+
+            self.assertEqual(
+                response.data[0]["workspace_name"],
+                workspace.name,
+            )
+
+        def test_user_cannot_see_invitation_for_another_email(self):
+            workspace = create_workspace(
+                name="Acme Development",
+                slug="acme-development",
+                user=self.user,
+            )
+
+            create_workspace_invitation(
+                workspace=workspace,
+                email="someone@example.com",
+                invited_by=self.user,
+                role=WorkspaceMembership.Role.MEMBER,
+            )
+
+            self.client.force_authenticate(
+                user=self.other_user,
+            )
+
+            response = self.client.get(
+                reverse(
+                    "my-workspace-invitation-list",
+                )
+            )
+
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_200_OK,
+            )
+
+            self.assertEqual(
+                response.data,
+                [],
+            )
+
 
 class CreateWorkspaceInvitationServiceTests(TestCase):
     def setUp(self):

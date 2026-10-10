@@ -13,6 +13,8 @@ import { useAuth } from "../auth/AuthContext";
 import ChannelChat from "../components/ChannelChat";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
+import InvitationInbox from "../components/InvitationInbox";
+import WorkspaceMembersPanel from "../components/WorkspaceMembersPanel";
 
 
 function workspaceInitial(workspace) {
@@ -70,6 +72,9 @@ function DashboardPage() {
     workspaceRole,
     setWorkspaceRole,
   ] = useState(null);
+
+  const [mainView, setMainView] =
+    useState("chat");
 
   const [
     workspacesLoading,
@@ -171,10 +176,14 @@ function DashboardPage() {
             return data[0];
           },
         );
+
+        return data;
       } catch (requestError) {
         setWorkspaceError(
           requestError.message,
         );
+
+        return [];
       } finally {
         setWorkspacesLoading(false);
       }
@@ -313,6 +322,17 @@ function DashboardPage() {
   ]);
 
 
+  function selectWorkspace(
+    workspace,
+  ) {
+    setActiveWorkspace(
+      workspace,
+    );
+
+    setMainView("chat");
+  }
+
+
   function handleWorkspaceCreated(
     workspace,
   ) {
@@ -326,6 +346,8 @@ function DashboardPage() {
     setActiveWorkspace(
       workspace,
     );
+
+    setMainView("chat");
   }
 
 
@@ -341,6 +363,30 @@ function DashboardPage() {
     );
 
     setActiveChannel(channel);
+    setMainView("chat");
+  }
+
+
+  async function handleInvitationAccepted(
+    workspaceId,
+  ) {
+    const updatedWorkspaces =
+      await loadWorkspaces();
+
+    const joinedWorkspace =
+      updatedWorkspaces.find(
+        (workspace) =>
+          workspace.id ===
+          workspaceId,
+      );
+
+    if (joinedWorkspace) {
+      setActiveWorkspace(
+        joinedWorkspace,
+      );
+
+      setMainView("chat");
+    }
   }
 
 
@@ -366,7 +412,9 @@ function DashboardPage() {
                     "workspace-item",
                     `workspace-tone-${index % 5}`,
                     activeWorkspace?.id ===
-                    workspace.id
+                      workspace.id &&
+                    mainView !==
+                      "invitations"
                       ? "active"
                       : "",
                   ]
@@ -376,7 +424,7 @@ function DashboardPage() {
                   key={workspace.id}
                   title={workspace.name}
                   onClick={() =>
-                    setActiveWorkspace(
+                    selectWorkspace(
                       workspace,
                     )
                   }
@@ -388,6 +436,28 @@ function DashboardPage() {
               ),
             )}
           </div>
+
+          <button
+            className={[
+              "workspace-inbox-button",
+              mainView ===
+              "invitations"
+                ? "active"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            type="button"
+            title="Workspace invitations"
+            aria-label="Workspace invitations"
+            onClick={() =>
+              setMainView(
+                "invitations",
+              )
+            }
+          >
+            @
+          </button>
 
           <button
             className="workspace-add"
@@ -424,7 +494,8 @@ function DashboardPage() {
               )}
             </div>
 
-            {canManageChannels && (
+            {canManageChannels &&
+              mainView === "chat" && (
               <button
                 className="channel-create-icon"
                 type="button"
@@ -443,151 +514,198 @@ function DashboardPage() {
 
           {activeWorkspace && (
             <div className="channel-sidebar-body">
-              {channelsLoading && (
-                <div className="channel-sidebar-status">
-                  Loading channels...
-                </div>
+              <div className="workspace-view-navigation">
+                <button
+                  className={
+                    mainView === "chat"
+                      ? "active"
+                      : ""
+                  }
+                  type="button"
+                  onClick={() =>
+                    setMainView(
+                      "chat",
+                    )
+                  }
+                >
+                  <span>
+                    #
+                  </span>
+
+                  Channels
+                </button>
+
+                <button
+                  className={
+                    mainView ===
+                    "members"
+                      ? "active"
+                      : ""
+                  }
+                  type="button"
+                  onClick={() =>
+                    setMainView(
+                      "members",
+                    )
+                  }
+                >
+                  <span>
+                    M
+                  </span>
+
+                  Members
+                </button>
+              </div>
+
+              {mainView === "chat" && (
+                <>
+                  {channelsLoading && (
+                    <div className="channel-sidebar-status">
+                      Loading channels...
+                    </div>
+                  )}
+
+                  {!channelsLoading &&
+                    channelError && (
+                      <div className="channel-sidebar-error">
+                        <span>
+                          {channelError}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            loadWorkspaceData(
+                              activeWorkspace,
+                            )
+                          }
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+
+                  {!channelsLoading &&
+                    !channelError && (
+                      <>
+                        <div className="channel-section">
+                          <div className="channel-section-heading">
+                            <span>
+                              Public channels
+                            </span>
+
+                            {canManageChannels && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCreateChannelModalOpen(
+                                    true,
+                                  )
+                                }
+                              >
+                                +
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="channel-list">
+                            {publicChannels.map(
+                              (channel) => (
+                                <button
+                                  className={[
+                                    "channel-list-item",
+                                    activeChannel?.id ===
+                                    channel.id
+                                      ? "active"
+                                      : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                  type="button"
+                                  key={channel.id}
+                                  onClick={() =>
+                                    setActiveChannel(
+                                      channel,
+                                    )
+                                  }
+                                >
+                                  <span className="channel-symbol">
+                                    #
+                                  </span>
+
+                                  <span className="channel-name">
+                                    {channel.name}
+                                  </span>
+
+                                  {channel.is_general && (
+                                    <span className="channel-general-badge">
+                                      default
+                                    </span>
+                                  )}
+                                </button>
+                              ),
+                            )}
+
+                            {publicChannels.length ===
+                              0 && (
+                              <div className="channel-empty-copy">
+                                No public channels.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="channel-section">
+                          <div className="channel-section-heading">
+                            <span>
+                              Private channels
+                            </span>
+                          </div>
+
+                          <div className="channel-list">
+                            {privateChannels.map(
+                              (channel) => (
+                                <button
+                                  className={[
+                                    "channel-list-item",
+                                    activeChannel?.id ===
+                                    channel.id
+                                      ? "active"
+                                      : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                  type="button"
+                                  key={channel.id}
+                                  onClick={() =>
+                                    setActiveChannel(
+                                      channel,
+                                    )
+                                  }
+                                >
+                                  <span className="channel-symbol private">
+                                    🔒
+                                  </span>
+
+                                  <span className="channel-name">
+                                    {channel.name}
+                                  </span>
+                                </button>
+                              ),
+                            )}
+
+                            {privateChannels.length ===
+                              0 && (
+                              <div className="channel-empty-copy">
+                                No private channels.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                </>
               )}
-
-              {!channelsLoading &&
-                channelError && (
-                  <div className="channel-sidebar-error">
-                    <span>
-                      {channelError}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        loadWorkspaceData(
-                          activeWorkspace,
-                        )
-                      }
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-
-              {!channelsLoading &&
-                !channelError && (
-                  <>
-                    <div className="channel-section">
-                      <div className="channel-section-heading">
-                        <span>
-                          Public channels
-                        </span>
-
-                        {canManageChannels && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCreateChannelModalOpen(
-                                true,
-                              )
-                            }
-                          >
-                            +
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="channel-list">
-                        {publicChannels.map(
-                          (channel) => (
-                            <button
-                              className={[
-                                "channel-list-item",
-                                activeChannel?.id ===
-                                channel.id
-                                  ? "active"
-                                  : "",
-                              ]
-                                .filter(Boolean)
-                                .join(" ")}
-                              type="button"
-                              key={channel.id}
-                              onClick={() =>
-                                setActiveChannel(
-                                  channel,
-                                )
-                              }
-                            >
-                              <span className="channel-symbol">
-                                #
-                              </span>
-
-                              <span className="channel-name">
-                                {channel.name}
-                              </span>
-
-                              {channel.is_general && (
-                                <span className="channel-general-badge">
-                                  default
-                                </span>
-                              )}
-                            </button>
-                          ),
-                        )}
-
-                        {publicChannels.length ===
-                          0 && (
-                          <div className="channel-empty-copy">
-                            No public channels.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="channel-section">
-                      <div className="channel-section-heading">
-                        <span>
-                          Private channels
-                        </span>
-                      </div>
-
-                      <div className="channel-list">
-                        {privateChannels.map(
-                          (channel) => (
-                            <button
-                              className={[
-                                "channel-list-item",
-                                activeChannel?.id ===
-                                channel.id
-                                  ? "active"
-                                  : "",
-                              ]
-                                .filter(Boolean)
-                                .join(" ")}
-                              type="button"
-                              key={channel.id}
-                              onClick={() =>
-                                setActiveChannel(
-                                  channel,
-                                )
-                              }
-                            >
-                              <span className="channel-symbol private">
-                                🔒
-                              </span>
-
-                              <span className="channel-name">
-                                {channel.name}
-                              </span>
-                            </button>
-                          ),
-                        )}
-
-                        {privateChannels.length ===
-                          0 && (
-                          <div className="channel-empty-copy">
-                            No private channels.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
             </div>
           )}
 
@@ -621,22 +739,35 @@ function DashboardPage() {
         </section>
 
         <section className="channel-content">
-          {workspacesLoading && (
-            <div className="workspace-state">
-              <div className="state-spinner" />
-
-              <h2>
-                Loading workspaces
-              </h2>
-
-              <p>
-                Fetching your team spaces
-                from the server.
-              </p>
-            </div>
+          {mainView ===
+            "invitations" && (
+            <InvitationInbox
+              onAccepted={
+                handleInvitationAccepted
+              }
+            />
           )}
 
-          {!workspacesLoading &&
+          {mainView !==
+              "invitations" &&
+            workspacesLoading && (
+              <div className="workspace-state">
+                <div className="state-spinner" />
+
+                <h2>
+                  Loading workspaces
+                </h2>
+
+                <p>
+                  Fetching your team spaces
+                  from the server.
+                </p>
+              </div>
+            )}
+
+          {mainView !==
+              "invitations" &&
+            !workspacesLoading &&
             workspaceError && (
               <div className="workspace-state">
                 <div className="state-icon error">
@@ -661,22 +792,25 @@ function DashboardPage() {
               </div>
             )}
 
-          {!workspacesLoading &&
+          {mainView !==
+              "invitations" &&
+            !workspacesLoading &&
             !workspaceError &&
-            workspaces.length === 0 && (
+            workspaces.length ===
+              0 && (
               <div className="workspace-state">
                 <div className="state-icon">
                   W
                 </div>
 
                 <h2>
-                  Create your first workspace
+                  No workspaces yet
                 </h2>
 
                 <p>
-                  Workspaces organize your
-                  team, channels and real-time
-                  conversations.
+                  Create a workspace or open
+                  your invitations using the
+                  @ button on the left.
                 </p>
 
                 <button
@@ -693,7 +827,26 @@ function DashboardPage() {
               </div>
             )}
 
-          {!workspacesLoading &&
+          {mainView ===
+              "members" &&
+            activeWorkspace &&
+            workspaceRole && (
+              <WorkspaceMembersPanel
+                key={
+                  activeWorkspace.id
+                }
+                workspace={
+                  activeWorkspace
+                }
+                workspaceRole={
+                  workspaceRole
+                }
+                user={user}
+              />
+            )}
+
+          {mainView === "chat" &&
+            !workspacesLoading &&
             !workspaceError &&
             activeWorkspace &&
             !channelsLoading &&
@@ -729,7 +882,8 @@ function DashboardPage() {
               </div>
             )}
 
-          {activeWorkspace &&
+          {mainView === "chat" &&
+            activeWorkspace &&
             activeChannel && (
               <ChannelChat
                 key={activeChannel.id}
