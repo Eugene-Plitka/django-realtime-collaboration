@@ -4,9 +4,20 @@ from django.db import models
 
 class Notification(models.Model):
     class Type(models.TextChoices):
-        MENTION = "mention", "Mention"
-        CHANNEL_ADDED = "channel_added", "Added to channel"
-        WORKSPACE_INVITATION = "workspace_invitation", "Workspace invitation"
+        MENTION = (
+            "mention",
+            "Mention",
+        )
+
+        CHANNEL_ADDED = (
+            "channel_added",
+            "Added to channel",
+        )
+
+        WORKSPACE_INVITATION = (
+            "workspace_invitation",
+            "Workspace invitation",
+        )
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -33,11 +44,17 @@ class Notification(models.Model):
     )
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = [
+            "-created_at",
+        ]
+
         indexes = [
             models.Index(
-                fields=["user", "is_read", "-created_at"],
-                name="notif_user_read_idx",
+                fields=[
+                    "user",
+                    "-created_at",
+                ],
+                name="notif_user_created_idx",
             )
         ]
 

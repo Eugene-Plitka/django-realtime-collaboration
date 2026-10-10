@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
@@ -99,12 +100,33 @@ class WorkspaceInvitation(models.Model):
         editable=False,
     )
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
     expires_at = models.DateTimeField()
+
     accepted_at = models.DateTimeField(
         null=True,
         blank=True,
     )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=[
+                    "workspace",
+                    "-created_at",
+                ],
+                name="ws_inv_workspace_created_idx",
+            ),
+            models.Index(
+                Lower("email"),
+                models.F("status"),
+                models.F("created_at").desc(),
+                name="ws_inv_email_status_idx",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.email} -> {self.workspace} ({self.status})"
