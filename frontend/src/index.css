@@ -4787,3 +4787,254 @@ button.cancel:hover {
   font-size: 12px;
   font-weight: 700;
 }
+
+/* Channel actions */
+
+.channel-actions-root {
+  position: relative;
+}
+
+.channel-actions-popover {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 370px;
+  overflow: hidden;
+  border:
+    1px solid #2a384f;
+  border-radius: 13px;
+  background: #111a29;
+  box-shadow:
+    0 24px 65px
+    rgba(0, 0, 0, 0.48);
+}
+
+.channel-actions-heading {
+  display: flex;
+  align-items: center;
+  min-height: 66px;
+  gap: 10px;
+  padding: 13px 15px;
+  border-bottom:
+    1px solid #202c40;
+}
+
+.channel-actions-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.channel-actions-heading strong,
+.channel-actions-heading span {
+  display: block;
+}
+
+.channel-actions-heading strong {
+  overflow: hidden;
+  color: #e4e8f0;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-actions-heading span {
+  margin-top: 4px;
+  color: #728096;
+  font-size: 9px;
+}
+
+.channel-actions-heading > button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #758299;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.channel-actions-back {
+  flex: 0 0 auto;
+  font-size: 14px !important;
+}
+
+.channel-actions-error {
+  padding: 9px 13px;
+  border-bottom:
+    1px solid rgba(
+      248,
+      113,
+      113,
+      0.15
+    );
+  background:
+    rgba(
+      127,
+      29,
+      29,
+      0.15
+    );
+  color: #f2a0aa;
+  font-size: 9px;
+}
+
+.channel-actions-menu {
+  display: grid;
+  padding: 7px;
+}
+
+.channel-actions-menu > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 39px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #a2aec0;
+  cursor: pointer;
+  font-size: 10px;
+  text-align: left;
+}
+
+.channel-actions-menu > button:hover {
+  background: #182235;
+  color: #d8deea;
+}
+
+.channel-actions-menu > button small {
+  color: #65738a;
+  font-size: 8px;
+}
+
+.channel-actions-menu > button.danger {
+  color: #d58b98;
+}
+
+.channel-actions-menu > button.danger:hover {
+  background:
+    rgba(
+      127,
+      29,
+      29,
+      0.15
+    );
+  color: #f29eaa;
+}
+
+.channel-actions-menu > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.channel-actions-state {
+  padding: 35px 18px;
+  color: #758299;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.channel-member-list {
+  max-height: 390px;
+  overflow-y: auto;
+}
+
+.channel-member-row {
+  display: flex;
+  align-items: center;
+  min-height: 62px;
+  gap: 10px;
+  padding: 9px 13px;
+  border-bottom:
+    1px solid #1d293b;
+}
+
+.channel-member-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border:
+    1px solid #34425d;
+  border-radius: 9px;
+  background:
+    linear-gradient(
+      145deg,
+      #273650,
+      #18243a
+    );
+  color: #d1d8e5;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.channel-member-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.channel-member-copy strong,
+.channel-member-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-member-copy strong {
+  color: #dce2eb;
+  font-size: 10px;
+}
+
+.channel-member-copy strong small {
+  margin-left: 5px;
+  color: #7f8dff;
+  font-size: 7px;
+}
+
+.channel-member-copy span {
+  margin-top: 4px;
+  color: #68768c;
+  font-size: 8px;
+}
+
+.channel-member-add,
+.channel-member-remove {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.channel-member-add {
+  border: 0;
+  background: #4e63ee;
+  color: #fff;
+}
+
+.channel-member-remove {
+  border:
+    1px solid #4b3540;
+  background: transparent;
+  color: #c88794;
+}
+
+.channel-member-remove:hover {
+  border-color: #80515d;
+  color: #f0a0af;
+}
+
+.channel-member-add:disabled,
+.channel-member-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

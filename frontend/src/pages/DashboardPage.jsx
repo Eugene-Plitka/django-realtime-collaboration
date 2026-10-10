@@ -424,6 +424,57 @@ function DashboardPage() {
     setMainView("chat");
   }
 
+  async function handleLeftChannel(
+    channel,
+  ) {
+    if (!activeWorkspace) {
+      return;
+    }
+
+    const response =
+      await apiRequest(
+        `/api/workspaces/${activeWorkspace.id}/channels/`,
+      );
+
+    if (!response.ok) {
+      setChannelError(
+        await readApiError(
+          response,
+          "Unable to refresh channels.",
+        ),
+      );
+
+      return;
+    }
+
+    const channelData =
+      await response.json();
+
+    const sortedChannels =
+      sortChannels(channelData);
+
+    setChannels(
+      sortedChannels,
+    );
+
+    const nextChannel =
+      sortedChannels.find(
+        (currentChannel) =>
+          currentChannel.is_general,
+      ) ??
+      sortedChannels.find(
+        (currentChannel) =>
+          currentChannel.id !==
+          channel.id,
+      ) ??
+      null;
+
+    setActiveChannel(
+      nextChannel,
+    );
+
+    setMainView("chat");
+  }
 
   async function handleInvitationAccepted(
     workspaceId,
@@ -976,6 +1027,9 @@ function DashboardPage() {
                 user={user}
                 activityControls={
                   activityControls
+                }
+                onLeftChannel={
+                  handleLeftChannel
                 }
               />
             )}

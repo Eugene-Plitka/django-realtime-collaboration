@@ -123,15 +123,16 @@ def add_channel_member(*, channel, user):
         user=user,
     )
 
-    create_and_deliver_notification(
-        user=user,
-        notification_type=Notification.Type.CHANNEL_ADDED,
-        payload={
-            "workspace_id": channel.workspace_id,
-            "channel_id": channel.id,
-            "channel_name": channel.name,
-        },
-    )
+    if channel.type == Channel.Type.PRIVATE:
+        create_and_deliver_notification(
+            user=user,
+            notification_type=Notification.Type.CHANNEL_ADDED,
+            payload={
+                "workspace_id": channel.workspace_id,
+                "channel_id": channel.id,
+                "channel_name": channel.name,
+            },
+        )
 
     return membership
 

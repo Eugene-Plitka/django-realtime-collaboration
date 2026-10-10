@@ -15,6 +15,7 @@ import {
   createChannelSocket,
 } from "../chat/socket";
 import MemberProfilePopover from "./MemberProfilePopover";
+import ChannelActionsMenu from "./ChannelActionsMenu";
 
 
 function normalizeMessage(message) {
@@ -185,6 +186,7 @@ function ChannelChat({
   workspace,
   user,
   activityControls,
+  onLeftChannel,
 }) {
   const [messages, setMessages] =
     useState([]);
@@ -1670,13 +1672,17 @@ function ChannelChat({
               : "Public"}
           </span>
 
-          <button
-            className="channel-more-button"
-            type="button"
-            title="Channel actions will be added later."
-          >
-            •••
-          </button>
+          <ChannelActionsMenu
+            channel={channel}
+            workspace={workspace}
+            user={user}
+            workspaceRole={
+              workspaceRole
+            }
+            onLeftChannel={
+              onLeftChannel
+            }
+          />
         </div>
       </header>
 
