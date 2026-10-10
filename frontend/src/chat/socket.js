@@ -20,33 +20,65 @@ function getWebSocketBaseUrl() {
 }
 
 
-export async function createChannelSocket(
-  channelId,
-) {
+async function getValidAccessToken() {
   let accessToken =
     getAccessToken();
 
-  if (!accessToken) {
-    const refreshed =
-      await refreshTokens();
-
-    if (!refreshed) {
-      throw new Error(
-        "Authentication is required.",
-      );
-    }
-
-    accessToken =
-      getAccessToken();
+  if (accessToken) {
+    return accessToken;
   }
+
+  const refreshed =
+    await refreshTokens();
+
+  if (!refreshed) {
+    throw new Error(
+      "Authentication is required.",
+    );
+  }
+
+  accessToken =
+    getAccessToken();
+
+  if (!accessToken) {
+    throw new Error(
+      "Authentication is required.",
+    );
+  }
+
+  return accessToken;
+}
+
+
+async function createAuthenticatedSocket(
+  path,
+) {
+  const accessToken =
+    await getValidAccessToken();
 
   const baseUrl =
     getWebSocketBaseUrl();
 
   return new WebSocket(
-    `${baseUrl}/ws/channels/${channelId}/`,
+    `${baseUrl}${path}`,
     [
       `jwt.${accessToken}`,
     ],
+  );
+}
+
+
+export async function createChannelSocket(
+  channelId,
+) {
+  return createAuthenticatedSocket(
+    `/ws/channels/${channelId}/`,
+  );
+}
+
+
+export async function createNotificationSocket() {
+  return createAuthenticatedSocket(
+    "/ws/notifications/",
   );
 }

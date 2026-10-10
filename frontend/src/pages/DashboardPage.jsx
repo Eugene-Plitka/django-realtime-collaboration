@@ -14,7 +14,9 @@ import ChannelChat from "../components/ChannelChat";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
 import InvitationInbox from "../components/InvitationInbox";
+import NotificationsPanel from "../components/NotificationsPanel";
 import WorkspaceMembersPanel from "../components/WorkspaceMembersPanel";
+import { useNotifications } from "../notifications/useNotifications";
 
 
 function workspaceInitial(workspace) {
@@ -52,6 +54,19 @@ function DashboardPage() {
     logout,
   } = useAuth();
 
+  const {
+    notifications,
+    unreadCount,
+    loading:
+      notificationsLoading,
+    error:
+      notificationsError,
+    socketStatus:
+      notificationSocketStatus,
+    markRead,
+    markUnread,
+  } = useNotifications();
+
   const [workspaces, setWorkspaces] =
     useState([]);
 
@@ -75,6 +90,11 @@ function DashboardPage() {
 
   const [mainView, setMainView] =
     useState("chat");
+
+  const [
+    notificationTargetChannelId,
+    setNotificationTargetChannelId,
+  ] = useState(null);
 
   const [
     workspacesLoading,
@@ -322,9 +342,44 @@ function DashboardPage() {
   ]);
 
 
+  useEffect(() => {
+    if (
+      !notificationTargetChannelId ||
+      channelsLoading
+    ) {
+      return;
+    }
+
+    const targetChannel =
+      channels.find(
+        (channel) =>
+          channel.id ===
+          notificationTargetChannelId,
+      );
+
+    if (targetChannel) {
+      setActiveChannel(
+        targetChannel,
+      );
+
+      setNotificationTargetChannelId(
+        null,
+      );
+    }
+  }, [
+    channels,
+    channelsLoading,
+    notificationTargetChannelId,
+  ]);
+
+
   function selectWorkspace(
     workspace,
   ) {
+    setNotificationTargetChannelId(
+      null,
+    );
+
     setActiveWorkspace(
       workspace,
     );
@@ -390,6 +445,58 @@ function DashboardPage() {
   }
 
 
+  function handleOpenNotification(
+    notification,
+  ) {
+    const payload =
+      notification.payload ?? {};
+
+    if (
+      notification.type ===
+      "workspace_invitation"
+    ) {
+      setMainView(
+        "invitations",
+      );
+
+      return;
+    }
+
+    const workspaceId =
+      payload.workspace_id;
+
+    const channelId =
+      payload.channel_id;
+
+    if (!workspaceId) {
+      return;
+    }
+
+    const targetWorkspace =
+      workspaces.find(
+        (workspace) =>
+          workspace.id ===
+          workspaceId,
+      );
+
+    if (!targetWorkspace) {
+      return;
+    }
+
+    if (channelId) {
+      setNotificationTargetChannelId(
+        channelId,
+      );
+    }
+
+    setActiveWorkspace(
+      targetWorkspace,
+    );
+
+    setMainView("chat");
+  }
+
+
   return (
     <>
       <main className="dashboard-page channel-layout">
@@ -414,7 +521,9 @@ function DashboardPage() {
                     activeWorkspace?.id ===
                       workspace.id &&
                     mainView !==
-                      "invitations"
+                      "invitations" &&
+                    mainView !==
+                      "notifications"
                       ? "active"
                       : "",
                   ]
@@ -436,6 +545,36 @@ function DashboardPage() {
               ),
             )}
           </div>
+
+          <button
+            className={[
+              "workspace-notification-button",
+              mainView ===
+              "notifications"
+                ? "active"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            type="button"
+            title="Notifications"
+            aria-label="Notifications"
+            onClick={() =>
+              setMainView(
+                "notifications",
+              )
+            }
+          >
+            N
+
+            {unreadCount > 0 && (
+              <span className="notification-badge">
+                {unreadCount > 99
+                  ? "99+"
+                  : unreadCount}
+              </span>
+            )}
+          </button>
 
           <button
             className={[
@@ -740,6 +879,36 @@ function DashboardPage() {
 
         <section className="channel-content">
           {mainView ===
+            "notifications" && (
+            <NotificationsPanel
+              notifications={
+                notifications
+              }
+              unreadCount={
+                unreadCount
+              }
+              loading={
+                notificationsLoading
+              }
+              error={
+                notificationsError
+              }
+              socketStatus={
+                notificationSocketStatus
+              }
+              onMarkRead={
+                markRead
+              }
+              onMarkUnread={
+                markUnread
+              }
+              onOpen={
+                handleOpenNotification
+              }
+            />
+          )}
+
+          {mainView ===
             "invitations" && (
             <InvitationInbox
               onAccepted={
@@ -750,6 +919,8 @@ function DashboardPage() {
 
           {mainView !==
               "invitations" &&
+            mainView !==
+              "notifications" &&
             workspacesLoading && (
               <div className="workspace-state">
                 <div className="state-spinner" />
@@ -767,6 +938,8 @@ function DashboardPage() {
 
           {mainView !==
               "invitations" &&
+            mainView !==
+              "notifications" &&
             !workspacesLoading &&
             workspaceError && (
               <div className="workspace-state">
@@ -794,6 +967,8 @@ function DashboardPage() {
 
           {mainView !==
               "invitations" &&
+            mainView !==
+              "notifications" &&
             !workspacesLoading &&
             !workspaceError &&
             workspaces.length ===
