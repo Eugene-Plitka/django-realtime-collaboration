@@ -10,6 +10,7 @@ import {
   readApiError,
 } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import ChannelChat from "../components/ChannelChat";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
 
@@ -728,117 +729,17 @@ function DashboardPage() {
               </div>
             )}
 
-          {activeChannel && (
-            <>
-              <header className="channel-content-header">
-                <div className="channel-heading-main">
-                  <div className="channel-heading-title">
-                    <span>
-                      {activeChannel.type ===
-                      "PRIVATE"
-                        ? "🔒"
-                        : "#"}
-                    </span>
-
-                    <h1>
-                      {activeChannel.name}
-                    </h1>
-                  </div>
-
-                  <p>
-                    {activeChannel.description ||
-                      (activeChannel.is_general
-                        ? "General workspace conversation."
-                        : "No channel description yet.")}
-                  </p>
-                </div>
-
-                <div className="channel-header-actions">
-                  <span className="channel-visibility-pill">
-                    {activeChannel.type ===
-                    "PRIVATE"
-                      ? "Private"
-                      : "Public"}
-                  </span>
-
-                  <button
-                    className="channel-more-button"
-                    type="button"
-                    title="Channel actions will be added later."
-                  >
-                    •••
-                  </button>
-                </div>
-              </header>
-
-              <div className="channel-placeholder">
-                <div className="channel-placeholder-icon">
-                  {activeChannel.type ===
-                  "PRIVATE"
-                    ? "🔒"
-                    : "#"}
-                </div>
-
-                <h2>
-                  Welcome to #
-                  {activeChannel.name}
-                </h2>
-
-                <p>
-                  This is the beginning of the
-                  channel. Message history and
-                  the real-time WebSocket chat
-                  will be connected next.
-                </p>
-
-                <div className="channel-placeholder-meta">
-                  <div>
-                    <span>
-                      Type
-                    </span>
-
-                    <strong>
-                      {activeChannel.type}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Channel ID
-                    </span>
-
-                    <strong>
-                      {activeChannel.id}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Workspace
-                    </span>
-
-                    <strong>
-                      {activeWorkspace.name}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="message-composer-preview">
-                <div>
-                  Message #
-                  {activeChannel.name}
-                </div>
-
-                <button
-                  type="button"
-                  disabled
-                >
-                  Send
-                </button>
-              </div>
-            </>
-          )}
+          {activeWorkspace &&
+            activeChannel && (
+              <ChannelChat
+                key={activeChannel.id}
+                channel={activeChannel}
+                workspace={
+                  activeWorkspace
+                }
+                user={user}
+              />
+            )}
         </section>
       </main>
 
