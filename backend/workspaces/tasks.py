@@ -30,9 +30,18 @@ def send_workspace_invitation_email(
     )
 
     if invitation is None:
+        logger.info(
+            "Workspace invitation email skipped: invitation_id=%s not found",
+            invitation_id,
+        )
         return
 
     if invitation.status != WorkspaceInvitation.Status.PENDING:
+        logger.info(
+            ("Workspace invitation email skipped: invitation_id=%s status=%s"),
+            invitation_id,
+            invitation.status,
+        )
         return
 
     subject = f"You have been invited to {invitation.workspace.name}"
@@ -50,16 +59,26 @@ def send_workspace_invitation_email(
             subject=subject,
             message=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[invitation.email],
+            recipient_list=[
+                invitation.email,
+            ],
             fail_silently=False,
         )
     except Exception as exc:
-        logger.exception(
-            "Workspace invitation email failed for invitation_id=%s",
+        logger.error(
+            ("Workspace invitation email failed: invitation_id=%s workspace_id=%s"),
             invitation_id,
+            invitation.workspace_id,
+            exc_info=not settings.TESTING,
         )
 
         raise self.retry(
             exc=exc,
             countdown=5,
         )
+
+    logger.info(
+        ("Workspace invitation email sent: invitation_id=%s workspace_id=%s"),
+        invitation.id,
+        invitation.workspace_id,
+    )

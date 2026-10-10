@@ -29,9 +29,18 @@ def send_notification_email(
     )
 
     if notification is None:
+        logger.info(
+            "Notification email skipped: notification_id=%s not found",
+            notification_id,
+        )
         return
 
     if not notification.user.email:
+        logger.info(
+            ("Notification email skipped: notification_id=%s user_id=%s has no email"),
+            notification.id,
+            notification.user_id,
+        )
         return
 
     if notification.type == Notification.Type.WORKSPACE_INVITATION:
@@ -63,6 +72,11 @@ def send_notification_email(
         message = f"You were added to #{channel_name}."
 
     else:
+        logger.info(
+            ("Notification email skipped: notification_id=%s unsupported_type=%s"),
+            notification.id,
+            notification.type,
+        )
         return
 
     try:
@@ -70,16 +84,28 @@ def send_notification_email(
             subject=subject,
             message=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[notification.user.email],
+            recipient_list=[
+                notification.user.email,
+            ],
             fail_silently=False,
         )
     except Exception as exc:
-        logger.exception(
-            "Notification email failed for notification_id=%s",
-            notification_id,
+        logger.error(
+            ("Notification email failed: notification_id=%s user_id=%s type=%s"),
+            notification.id,
+            notification.user_id,
+            notification.type,
+            exc_info=not settings.TESTING,
         )
 
         raise self.retry(
             exc=exc,
             countdown=5,
         )
+
+    logger.info(
+        ("Notification email sent: notification_id=%s user_id=%s type=%s"),
+        notification.id,
+        notification.user_id,
+        notification.type,
+    )

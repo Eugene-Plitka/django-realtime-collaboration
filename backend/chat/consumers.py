@@ -1,3 +1,5 @@
+import logging
+
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from workspaces.models import WorkspaceMembership
@@ -16,6 +18,9 @@ from .services import (
     delete_message,
     edit_message,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def reply_to_data(message):
@@ -231,6 +236,10 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         user = self.scope["user"]
 
         if not user.is_authenticated:
+            logger.warning(
+                "WebSocket connection rejected: unauthenticated channel connection",
+            )
+
             await self.close(
                 code=4401,
             )
@@ -244,6 +253,15 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         )
 
         if not has_access:
+            logger.warning(
+                (
+                    "WebSocket connection rejected: "
+                    "user_id=%s channel_id=%s access_denied"
+                ),
+                user.id,
+                self.channel_id,
+            )
+
             await self.close(
                 code=4403,
             )
@@ -257,7 +275,15 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         )
 
         await self.accept(
-            subprotocol=self.scope.get("jwt_subprotocol"),
+            subprotocol=self.scope.get(
+                "jwt_subprotocol",
+            ),
+        )
+
+        logger.info(
+            ("WebSocket connected: user_id=%s channel_id=%s"),
+            user.id,
+            self.channel_id,
         )
 
     async def disconnect(
@@ -272,6 +298,21 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
                 self.group_name,
                 self.channel_name,
             )
+
+        user = self.scope.get(
+            "user",
+        )
+
+        logger.info(
+            ("WebSocket disconnected: user_id=%s channel_id=%s close_code=%s"),
+            (user.id if user is not None and user.is_authenticated else None),
+            getattr(
+                self,
+                "channel_id",
+                None,
+            ),
+            close_code,
+        )
 
     async def receive_json(
         self,
@@ -420,6 +461,21 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         code,
         message,
     ):
+        user = self.scope.get(
+            "user",
+        )
+
+        logger.warning(
+            ("WebSocket event rejected: user_id=%s channel_id=%s code=%s"),
+            (user.id if user is not None and user.is_authenticated else None),
+            getattr(
+                self,
+                "channel_id",
+                None,
+            ),
+            code,
+        )
+
         await self.send_json(
             {
                 "type": "error",

@@ -1,3 +1,4 @@
+import logging
 import re
 
 from django.db import transaction
@@ -12,6 +13,9 @@ from .models import (
     ChannelMembership,
     Message,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @transaction.atomic
@@ -70,10 +74,19 @@ def join_channel(*, channel, user):
     ).exists():
         raise ValueError("User is already a channel member.")
 
-    return ChannelMembership.objects.create(
+    membership = ChannelMembership.objects.create(
         channel=channel,
         user=user,
     )
+
+    logger.info(
+        ("Channel joined: user_id=%s channel_id=%s workspace_id=%s"),
+        user.id,
+        channel.id,
+        channel.workspace_id,
+    )
+
+    return membership
 
 
 @transaction.atomic
@@ -102,6 +115,13 @@ def leave_channel(*, channel, user):
         raise ValueError("This member cannot leave the general channel.")
 
     channel_membership.delete()
+
+    logger.info(
+        ("Channel left: user_id=%s channel_id=%s workspace_id=%s"),
+        user.id,
+        channel.id,
+        channel.workspace_id,
+    )
 
 
 @transaction.atomic
@@ -234,6 +254,13 @@ def create_message(
         message=message,
     )
 
+    logger.info(
+        ("Message created: message_id=%s channel_id=%s author_id=%s"),
+        message.id,
+        channel.id,
+        author.id,
+    )
+
     return message
 
 
@@ -253,6 +280,13 @@ def edit_message(*, message, text):
         ]
     )
 
+    logger.info(
+        ("Message edited: message_id=%s channel_id=%s author_id=%s"),
+        message.id,
+        message.channel_id,
+        message.author_id,
+    )
+
     return message
 
 
@@ -268,6 +302,13 @@ def delete_message(*, message):
             "is_deleted",
             "updated_at",
         ]
+    )
+
+    logger.info(
+        ("Message deleted: message_id=%s channel_id=%s author_id=%s"),
+        message.id,
+        message.channel_id,
+        message.author_id,
     )
 
     return message
