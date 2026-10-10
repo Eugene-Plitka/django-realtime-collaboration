@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -9,6 +10,7 @@ import {
   readApiError,
 } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
 
 
@@ -18,6 +20,25 @@ function workspaceInitial(workspace) {
       ?.trim()
       .slice(0, 1)
       .toUpperCase() || "W"
+  );
+}
+
+
+function sortChannels(channels) {
+  return [...channels].sort(
+    (first, second) => {
+      if (first.is_general) {
+        return -1;
+      }
+
+      if (second.is_general) {
+        return 1;
+      }
+
+      return first.name.localeCompare(
+        second.name,
+      );
+    },
   );
 }
 
@@ -36,22 +57,77 @@ function DashboardPage() {
     setActiveWorkspace,
   ] = useState(null);
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
+  const [channels, setChannels] =
+    useState([]);
 
   const [
-    createModalOpen,
-    setCreateModalOpen,
+    activeChannel,
+    setActiveChannel,
+  ] = useState(null);
+
+  const [
+    workspaceRole,
+    setWorkspaceRole,
+  ] = useState(null);
+
+  const [
+    workspacesLoading,
+    setWorkspacesLoading,
+  ] = useState(true);
+
+  const [
+    channelsLoading,
+    setChannelsLoading,
   ] = useState(false);
+
+  const [
+    workspaceError,
+    setWorkspaceError,
+  ] = useState("");
+
+  const [
+    channelError,
+    setChannelError,
+  ] = useState("");
+
+  const [
+    createWorkspaceModalOpen,
+    setCreateWorkspaceModalOpen,
+  ] = useState(false);
+
+  const [
+    createChannelModalOpen,
+    setCreateChannelModalOpen,
+  ] = useState(false);
+
+
+  const publicChannels = useMemo(
+    () =>
+      channels.filter(
+        (channel) =>
+          channel.type === "PUBLIC",
+      ),
+    [channels],
+  );
+
+  const privateChannels = useMemo(
+    () =>
+      channels.filter(
+        (channel) =>
+          channel.type === "PRIVATE",
+      ),
+    [channels],
+  );
+
+  const canManageChannels =
+    workspaceRole === "OWNER" ||
+    workspaceRole === "ADMIN";
 
 
   const loadWorkspaces = useCallback(
     async () => {
-      setLoading(true);
-      setError("");
+      setWorkspacesLoading(true);
+      setWorkspaceError("");
 
       try {
         const response = await apiRequest(
@@ -95,20 +171,145 @@ function DashboardPage() {
           },
         );
       } catch (requestError) {
-        setError(
+        setWorkspaceError(
           requestError.message,
         );
       } finally {
-        setLoading(false);
+        setWorkspacesLoading(false);
       }
     },
     [],
   );
 
 
+  const loadWorkspaceData = useCallback(
+    async (workspace) => {
+      if (!workspace) {
+        setChannels([]);
+        setActiveChannel(null);
+        setWorkspaceRole(null);
+        return;
+      }
+
+      setChannelsLoading(true);
+      setChannelError("");
+
+      try {
+        const [
+          channelsResponse,
+          membersResponse,
+        ] = await Promise.all([
+          apiRequest(
+            `/api/workspaces/${workspace.id}/channels/`,
+          ),
+          apiRequest(
+            `/api/workspaces/${workspace.id}/members/`,
+          ),
+        ]);
+
+        if (!channelsResponse.ok) {
+          throw new Error(
+            await readApiError(
+              channelsResponse,
+              "Unable to load channels.",
+            ),
+          );
+        }
+
+        if (!membersResponse.ok) {
+          throw new Error(
+            await readApiError(
+              membersResponse,
+              "Unable to load workspace membership.",
+            ),
+          );
+        }
+
+        const [
+          channelData,
+          memberData,
+        ] = await Promise.all([
+          channelsResponse.json(),
+          membersResponse.json(),
+        ]);
+
+        const sortedChannels =
+          sortChannels(channelData);
+
+        setChannels(
+          sortedChannels,
+        );
+
+        const currentMembership =
+          memberData.find(
+            (membership) =>
+              membership.user_id ===
+              user.id,
+          );
+
+        setWorkspaceRole(
+          currentMembership?.role ??
+            null,
+        );
+
+        setActiveChannel(
+          (currentChannel) => {
+            if (
+              currentChannel &&
+              sortedChannels.some(
+                (channel) =>
+                  channel.id ===
+                  currentChannel.id,
+              )
+            ) {
+              return sortedChannels.find(
+                (channel) =>
+                  channel.id ===
+                  currentChannel.id,
+              );
+            }
+
+            return (
+              sortedChannels.find(
+                (channel) =>
+                  channel.is_general,
+              ) ??
+              sortedChannels[0] ??
+              null
+            );
+          },
+        );
+      } catch (requestError) {
+        setChannelError(
+          requestError.message,
+        );
+
+        setChannels([]);
+        setActiveChannel(null);
+        setWorkspaceRole(null);
+      } finally {
+        setChannelsLoading(false);
+      }
+    },
+    [user.id],
+  );
+
+
   useEffect(() => {
     loadWorkspaces();
   }, [loadWorkspaces]);
+
+
+  useEffect(() => {
+    setActiveChannel(null);
+
+    loadWorkspaceData(
+      activeWorkspace,
+    );
+  }, [
+    activeWorkspace,
+    loadWorkspaceData,
+  ]);
 
 
   function handleWorkspaceCreated(
@@ -127,9 +328,24 @@ function DashboardPage() {
   }
 
 
+  function handleChannelCreated(
+    channel,
+  ) {
+    setChannels(
+      (currentChannels) =>
+        sortChannels([
+          ...currentChannels,
+          channel,
+        ]),
+    );
+
+    setActiveChannel(channel);
+  }
+
+
   return (
     <>
-      <main className="dashboard-page">
+      <main className="dashboard-page channel-layout">
         <aside className="workspace-rail">
           <div
             className="workspace-logo"
@@ -147,9 +363,7 @@ function DashboardPage() {
                 <button
                   className={[
                     "workspace-item",
-                    `workspace-tone-${
-                      index % 5
-                    }`,
+                    `workspace-tone-${index % 5}`,
                     activeWorkspace?.id ===
                     workspace.id
                       ? "active"
@@ -180,7 +394,7 @@ function DashboardPage() {
             title="Create workspace"
             aria-label="Create workspace"
             onClick={() =>
-              setCreateModalOpen(
+              setCreateWorkspaceModalOpen(
                 true,
               )
             }
@@ -189,134 +403,224 @@ function DashboardPage() {
           </button>
         </aside>
 
-        <section className="dashboard-sidebar">
-          <div className="dashboard-brand">
-            <span className="status-dot" />
-
-            CollabSpace
-          </div>
-
-          {activeWorkspace ? (
-            <div className="active-workspace-summary">
-              <span className="active-workspace-label">
+        <section className="channel-sidebar">
+          <div className="channel-sidebar-header">
+            <div className="channel-workspace-heading">
+              <span>
                 Workspace
               </span>
 
               <strong>
-                {activeWorkspace.name}
-              </strong>
-
-              <span>
-                /{activeWorkspace.slug}
-              </span>
-            </div>
-          ) : (
-            <div className="active-workspace-summary muted">
-              <span className="active-workspace-label">
-                Workspace
-              </span>
-
-              <strong>
-                No workspace selected
-              </strong>
-            </div>
-          )}
-
-          <nav className="dashboard-nav">
-            <button
-              className="nav-item active"
-              type="button"
-            >
-              Overview
-            </button>
-
-            <button
-              className="nav-item"
-              type="button"
-              disabled={!activeWorkspace}
-            >
-              Channels
-            </button>
-
-            <button
-              className="nav-item"
-              type="button"
-              disabled={!activeWorkspace}
-            >
-              Members
-            </button>
-
-            <button
-              className="nav-item"
-              type="button"
-            >
-              Notifications
-            </button>
-          </nav>
-
-          <div className="dashboard-user">
-            <div className="dashboard-avatar">
-              {user.username
-                .slice(0, 1)
-                .toUpperCase()}
-            </div>
-
-            <div>
-              <strong>
-                {user.username}
-              </strong>
-
-              <span>
-                {user.email}
-              </span>
-            </div>
-          </div>
-
-          <button
-            className="logout-button"
-            type="button"
-            onClick={logout}
-          >
-            Sign out
-          </button>
-        </section>
-
-        <section className="dashboard-content">
-          <div className="dashboard-topbar">
-            <div>
-              <span className="dashboard-eyebrow">
-                Workspace hub
-              </span>
-
-              <h1>
                 {activeWorkspace
                   ? activeWorkspace.name
-                  : "Your workspaces"}
-              </h1>
+                  : "No workspace"}
+              </strong>
+
+              {workspaceRole && (
+                <small>
+                  {workspaceRole}
+                </small>
+              )}
             </div>
 
-            <div className="dashboard-topbar-actions">
-              <div className="online-pill">
-                <span />
-
-                Online
-              </div>
-
+            {canManageChannels && (
               <button
-                className="topbar-create-button"
+                className="channel-create-icon"
                 type="button"
+                title="Create channel"
+                aria-label="Create channel"
                 onClick={() =>
-                  setCreateModalOpen(
+                  setCreateChannelModalOpen(
                     true,
                   )
                 }
               >
-                + New workspace
+                +
               </button>
-            </div>
+            )}
           </div>
 
-          {loading && (
+          {activeWorkspace && (
+            <div className="channel-sidebar-body">
+              {channelsLoading && (
+                <div className="channel-sidebar-status">
+                  Loading channels...
+                </div>
+              )}
+
+              {!channelsLoading &&
+                channelError && (
+                  <div className="channel-sidebar-error">
+                    <span>
+                      {channelError}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        loadWorkspaceData(
+                          activeWorkspace,
+                        )
+                      }
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
+              {!channelsLoading &&
+                !channelError && (
+                  <>
+                    <div className="channel-section">
+                      <div className="channel-section-heading">
+                        <span>
+                          Public channels
+                        </span>
+
+                        {canManageChannels && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCreateChannelModalOpen(
+                                true,
+                              )
+                            }
+                          >
+                            +
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="channel-list">
+                        {publicChannels.map(
+                          (channel) => (
+                            <button
+                              className={[
+                                "channel-list-item",
+                                activeChannel?.id ===
+                                channel.id
+                                  ? "active"
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              type="button"
+                              key={channel.id}
+                              onClick={() =>
+                                setActiveChannel(
+                                  channel,
+                                )
+                              }
+                            >
+                              <span className="channel-symbol">
+                                #
+                              </span>
+
+                              <span className="channel-name">
+                                {channel.name}
+                              </span>
+
+                              {channel.is_general && (
+                                <span className="channel-general-badge">
+                                  default
+                                </span>
+                              )}
+                            </button>
+                          ),
+                        )}
+
+                        {publicChannels.length ===
+                          0 && (
+                          <div className="channel-empty-copy">
+                            No public channels.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="channel-section">
+                      <div className="channel-section-heading">
+                        <span>
+                          Private channels
+                        </span>
+                      </div>
+
+                      <div className="channel-list">
+                        {privateChannels.map(
+                          (channel) => (
+                            <button
+                              className={[
+                                "channel-list-item",
+                                activeChannel?.id ===
+                                channel.id
+                                  ? "active"
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              type="button"
+                              key={channel.id}
+                              onClick={() =>
+                                setActiveChannel(
+                                  channel,
+                                )
+                              }
+                            >
+                              <span className="channel-symbol private">
+                                🔒
+                              </span>
+
+                              <span className="channel-name">
+                                {channel.name}
+                              </span>
+                            </button>
+                          ),
+                        )}
+
+                        {privateChannels.length ===
+                          0 && (
+                          <div className="channel-empty-copy">
+                            No private channels.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+            </div>
+          )}
+
+          <div className="channel-sidebar-footer">
+            <div className="dashboard-user">
+              <div className="dashboard-avatar">
+                {user.username
+                  .slice(0, 1)
+                  .toUpperCase()}
+              </div>
+
+              <div>
+                <strong>
+                  {user.username}
+                </strong>
+
+                <span>
+                  {user.email}
+                </span>
+              </div>
+            </div>
+
+            <button
+              className="logout-button"
+              type="button"
+              onClick={logout}
+            >
+              Sign out
+            </button>
+          </div>
+        </section>
+
+        <section className="channel-content">
+          {workspacesLoading && (
             <div className="workspace-state">
               <div className="state-spinner" />
 
@@ -331,32 +635,33 @@ function DashboardPage() {
             </div>
           )}
 
-          {!loading && error && (
-            <div className="workspace-state">
-              <div className="state-icon error">
-                !
+          {!workspacesLoading &&
+            workspaceError && (
+              <div className="workspace-state">
+                <div className="state-icon error">
+                  !
+                </div>
+
+                <h2>
+                  Could not load workspaces
+                </h2>
+
+                <p>
+                  {workspaceError}
+                </p>
+
+                <button
+                  className="primary-button state-action"
+                  type="button"
+                  onClick={loadWorkspaces}
+                >
+                  Try again
+                </button>
               </div>
+            )}
 
-              <h2>
-                Could not load workspaces
-              </h2>
-
-              <p>
-                {error}
-              </p>
-
-              <button
-                className="primary-button state-action"
-                type="button"
-                onClick={loadWorkspaces}
-              >
-                Try again
-              </button>
-            </div>
-          )}
-
-          {!loading &&
-            !error &&
+          {!workspacesLoading &&
+            !workspaceError &&
             workspaces.length === 0 && (
               <div className="workspace-state">
                 <div className="state-icon">
@@ -369,15 +674,15 @@ function DashboardPage() {
 
                 <p>
                   Workspaces organize your
-                  team, channels, members and
-                  real-time conversations.
+                  team, channels and real-time
+                  conversations.
                 </p>
 
                 <button
                   className="primary-button state-action"
                   type="button"
                   onClick={() =>
-                    setCreateModalOpen(
+                    setCreateWorkspaceModalOpen(
                       true,
                     )
                   }
@@ -387,155 +692,184 @@ function DashboardPage() {
               </div>
             )}
 
-          {!loading &&
-            !error &&
-            activeWorkspace && (
-              <div className="workspace-overview">
-                <section className="workspace-hero">
-                  <div className="workspace-hero-icon">
-                    {workspaceInitial(
-                      activeWorkspace,
-                    )}
-                  </div>
-
-                  <div className="workspace-hero-copy">
-                    <span>
-                      Active workspace
-                    </span>
-
-                    <h2>
-                      {activeWorkspace.name}
-                    </h2>
-
-                    <p>
-                      /{activeWorkspace.slug}
-                    </p>
-                  </div>
-
-                  <button
-                    className="primary-button workspace-open-button"
-                    type="button"
-                    disabled
-                    title="Channels will be connected on the next step."
-                  >
-                    Open channels
-                  </button>
-                </section>
-
-                <div className="workspace-card-grid">
-                  <article className="workspace-info-card">
-                    <div className="workspace-card-icon">
-                      #
-                    </div>
-
-                    <div>
-                      <span>
-                        Channels
-                      </span>
-
-                      <strong>
-                        Ready to connect
-                      </strong>
-
-                      <p>
-                        The next step will load
-                        real public and private
-                        channels.
-                      </p>
-                    </div>
-                  </article>
-
-                  <article className="workspace-info-card">
-                    <div className="workspace-card-icon">
-                      M
-                    </div>
-
-                    <div>
-                      <span>
-                        Members
-                      </span>
-
-                      <strong>
-                        Team access
-                      </strong>
-
-                      <p>
-                        Owner, admin, member and
-                        guest roles are already
-                        supported by the API.
-                      </p>
-                    </div>
-                  </article>
-
-                  <article className="workspace-info-card">
-                    <div className="workspace-card-icon">
-                      N
-                    </div>
-
-                    <div>
-                      <span>
-                        Notifications
-                      </span>
-
-                      <strong>
-                        Real-time ready
-                      </strong>
-
-                      <p>
-                        Persistent notifications,
-                        WebSocket delivery and
-                        Celery email are already
-                        available.
-                      </p>
-                    </div>
-                  </article>
+          {!workspacesLoading &&
+            !workspaceError &&
+            activeWorkspace &&
+            !channelsLoading &&
+            !channelError &&
+            !activeChannel && (
+              <div className="workspace-state">
+                <div className="state-icon">
+                  #
                 </div>
 
-                <section className="workspace-details-card">
-                  <div>
-                    <span>
-                      Workspace ID
-                    </span>
+                <h2>
+                  No channels available
+                </h2>
 
-                    <strong>
-                      {activeWorkspace.id}
-                    </strong>
-                  </div>
+                <p>
+                  There are no channels you
+                  can access in this workspace.
+                </p>
 
-                  <div>
-                    <span>
-                      Slug
-                    </span>
-
-                    <strong>
-                      {activeWorkspace.slug}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Created
-                    </span>
-
-                    <strong>
-                      {new Date(
-                        activeWorkspace.created_at,
-                      ).toLocaleDateString()}
-                    </strong>
-                  </div>
-                </section>
+                {canManageChannels && (
+                  <button
+                    className="primary-button state-action"
+                    type="button"
+                    onClick={() =>
+                      setCreateChannelModalOpen(
+                        true,
+                      )
+                    }
+                  >
+                    Create channel
+                  </button>
+                )}
               </div>
             )}
+
+          {activeChannel && (
+            <>
+              <header className="channel-content-header">
+                <div className="channel-heading-main">
+                  <div className="channel-heading-title">
+                    <span>
+                      {activeChannel.type ===
+                      "PRIVATE"
+                        ? "🔒"
+                        : "#"}
+                    </span>
+
+                    <h1>
+                      {activeChannel.name}
+                    </h1>
+                  </div>
+
+                  <p>
+                    {activeChannel.description ||
+                      (activeChannel.is_general
+                        ? "General workspace conversation."
+                        : "No channel description yet.")}
+                  </p>
+                </div>
+
+                <div className="channel-header-actions">
+                  <span className="channel-visibility-pill">
+                    {activeChannel.type ===
+                    "PRIVATE"
+                      ? "Private"
+                      : "Public"}
+                  </span>
+
+                  <button
+                    className="channel-more-button"
+                    type="button"
+                    title="Channel actions will be added later."
+                  >
+                    •••
+                  </button>
+                </div>
+              </header>
+
+              <div className="channel-placeholder">
+                <div className="channel-placeholder-icon">
+                  {activeChannel.type ===
+                  "PRIVATE"
+                    ? "🔒"
+                    : "#"}
+                </div>
+
+                <h2>
+                  Welcome to #
+                  {activeChannel.name}
+                </h2>
+
+                <p>
+                  This is the beginning of the
+                  channel. Message history and
+                  the real-time WebSocket chat
+                  will be connected next.
+                </p>
+
+                <div className="channel-placeholder-meta">
+                  <div>
+                    <span>
+                      Type
+                    </span>
+
+                    <strong>
+                      {activeChannel.type}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      Channel ID
+                    </span>
+
+                    <strong>
+                      {activeChannel.id}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      Workspace
+                    </span>
+
+                    <strong>
+                      {activeWorkspace.name}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="message-composer-preview">
+                <div>
+                  Message #
+                  {activeChannel.name}
+                </div>
+
+                <button
+                  type="button"
+                  disabled
+                >
+                  Send
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </main>
 
       <CreateWorkspaceModal
-        open={createModalOpen}
+        open={
+          createWorkspaceModalOpen
+        }
         onClose={() =>
-          setCreateModalOpen(false)
+          setCreateWorkspaceModalOpen(
+            false,
+          )
         }
         onCreated={
           handleWorkspaceCreated
+        }
+      />
+
+      <CreateChannelModal
+        open={
+          createChannelModalOpen
+        }
+        workspace={
+          activeWorkspace
+        }
+        onClose={() =>
+          setCreateChannelModalOpen(
+            false,
+          )
+        }
+        onCreated={
+          handleChannelCreated
         }
       />
     </>
