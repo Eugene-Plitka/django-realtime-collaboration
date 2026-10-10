@@ -465,8 +465,13 @@ class WorkspaceInvitationListCreateView(generics.ListCreateAPIView):
         workspace = self.get_workspace()
 
         return (
-            WorkspaceInvitation.objects.filter(workspace=workspace)
-            .select_related("invited_by")
+            WorkspaceInvitation.objects.filter(
+                workspace=workspace,
+            )
+            .select_related(
+                "workspace",
+                "invited_by",
+            )
             .order_by("-created_at")
         )
 

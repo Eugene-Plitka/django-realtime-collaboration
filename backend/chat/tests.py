@@ -2,7 +2,9 @@ from accounts.models import User
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from config.asgi import application
+from django.db import connection
 from django.test import TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -661,6 +663,67 @@ class ChannelAPITests(APITestCase):
             status.HTTP_204_NO_CONTENT,
         )
 
+    def test_channel_member_list_does_not_create_n_plus_one_queries(self):
+        channel = Channel.objects.create(
+            workspace=self.workspace,
+            name="performance",
+            type=Channel.Type.PRIVATE,
+            created_by=self.owner,
+        )
+
+        ChannelMembership.objects.create(
+            channel=channel,
+            user=self.owner,
+        )
+
+        for number in range(10):
+            member = User.objects.create_user(
+                email=f"channel-member-{number}@example.com",
+                username=f"channelmember{number}",
+                password="StrongPassword123!",
+            )
+
+            add_workspace_member(
+                workspace=self.workspace,
+                user=member,
+                role=WorkspaceMembership.Role.MEMBER,
+            )
+
+            ChannelMembership.objects.create(
+                channel=channel,
+                user=member,
+            )
+
+        url = reverse(
+            "channel-member-list-create",
+            kwargs={
+                "channel_id": channel.id,
+            },
+        )
+
+        with CaptureQueriesContext(
+            connection,
+        ) as queries:
+            response = self.client.get(
+                url,
+            )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            11,
+        )
+
+        self.assertLessEqual(
+            len(queries),
+            4,
+            msg=(f"Channel member list uses too many SQL queries: {len(queries)}"),
+        )
+
 
 class MessageAPITests(APITestCase):
     def setUp(self):
@@ -875,6 +938,62 @@ class MessageAPITests(APITestCase):
                 author=outsider,
                 text="I should not be able to send this",
             )
+
+    def test_message_history_with_replies_does_not_create_n_plus_one_queries(
+        self,
+    ):
+        root_messages = []
+
+        for number in range(10):
+            message = Message.objects.create(
+                channel=self.channel,
+                author=self.member,
+                text=f"Root message {number}",
+            )
+
+            root_messages.append(
+                message,
+            )
+
+        for number, root_message in enumerate(
+            root_messages,
+        ):
+            Message.objects.create(
+                channel=self.channel,
+                author=self.member,
+                reply_to=root_message,
+                text=f"Reply message {number}",
+            )
+
+        url = reverse(
+            "message-list",
+            kwargs={
+                "channel_id": self.channel.id,
+            },
+        )
+
+        with CaptureQueriesContext(
+            connection,
+        ) as queries:
+            response = self.client.get(
+                url,
+            )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data["results"]),
+            20,
+        )
+
+        self.assertLessEqual(
+            len(queries),
+            5,
+            msg=(f"Message history uses too many SQL queries: {len(queries)}"),
+        )
 
 
 @database_sync_to_async

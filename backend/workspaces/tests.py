@@ -2,7 +2,9 @@ from datetime import timedelta
 
 from accounts.models import User
 from chat.models import Channel, ChannelMembership
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from notifications.models import Notification
@@ -262,6 +264,58 @@ class WorkspaceAPITests(APITestCase):
             response.data[0]["role"],
             WorkspaceMembership.Role.OWNER,
         )
+
+        def test_workspace_member_list_does_not_create_n_plus_one_queries(self):
+            workspace = create_workspace(
+                name="Performance Workspace",
+                slug="performance-workspace",
+                user=self.user,
+            )
+
+            for number in range(10):
+                member = User.objects.create_user(
+                    email=f"member-{number}@example.com",
+                    username=f"member{number}",
+                    password="StrongPassword123!",
+                )
+
+                WorkspaceMembership.objects.create(
+                    workspace=workspace,
+                    user=member,
+                    role=WorkspaceMembership.Role.MEMBER,
+                )
+
+            url = reverse(
+                "workspace-member-list",
+                kwargs={
+                    "workspace_id": workspace.id,
+                },
+            )
+
+            with CaptureQueriesContext(
+                connection,
+            ) as queries:
+                response = self.client.get(
+                    url,
+                )
+
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_200_OK,
+            )
+
+            self.assertEqual(
+                len(response.data),
+                11,
+            )
+
+            self.assertLessEqual(
+                len(queries),
+                3,
+                msg=(
+                    f"Workspace member list uses too many SQL queries: {len(queries)}"
+                ),
+            )
 
     def test_user_cannot_list_members_of_other_workspace(self):
         workspace = create_workspace(
@@ -1222,12 +1276,16 @@ class WorkspaceAPITests(APITestCase):
             role=WorkspaceMembership.Role.MEMBER,
         )
 
-        self.client.force_authenticate(user=admin)
+        self.client.force_authenticate(
+            user=admin,
+        )
 
         response = self.client.get(
             reverse(
                 "workspace-invitation-list-create",
-                kwargs={"workspace_id": workspace.id},
+                kwargs={
+                    "workspace_id": workspace.id,
+                },
             )
         )
 
@@ -1236,94 +1294,141 @@ class WorkspaceAPITests(APITestCase):
             status.HTTP_200_OK,
         )
 
-        def test_user_can_list_own_pending_invitations(self):
-            workspace = create_workspace(
-                name="Acme Development",
-                slug="acme-development",
-                user=self.user,
-            )
+    def test_user_can_list_own_pending_invitations(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
 
-            invited_user = User.objects.create_user(
-                email="member@example.com",
-                username="member",
-                password="StrongPassword123!",
-            )
+        invited_user = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
 
-            invitation = create_workspace_invitation(
-                workspace=workspace,
-                email=invited_user.email,
-                invited_by=self.user,
-                role=WorkspaceMembership.Role.MEMBER,
-            )
+        invitation = create_workspace_invitation(
+            workspace=workspace,
+            email=invited_user.email,
+            invited_by=self.user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
 
-            self.client.force_authenticate(
-                user=invited_user,
-            )
+        self.client.force_authenticate(
+            user=invited_user,
+        )
 
-            response = self.client.get(
-                reverse(
-                    "my-workspace-invitation-list",
-                )
+        response = self.client.get(
+            reverse(
+                "my-workspace-invitation-list",
             )
+        )
 
-            self.assertEqual(
-                response.status_code,
-                status.HTTP_200_OK,
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            len(response.data),
+            1,
+        )
+
+        self.assertEqual(
+            response.data[0]["id"],
+            invitation.id,
+        )
+
+        self.assertEqual(
+            response.data[0]["workspace"],
+            workspace.id,
+        )
+
+        self.assertEqual(
+            response.data[0]["workspace_name"],
+            workspace.name,
+        )
+
+    def test_user_cannot_see_invitation_for_another_email(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        create_workspace_invitation(
+            workspace=workspace,
+            email="someone@example.com",
+            invited_by=self.user,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(
+            user=self.other_user,
+        )
+
+        response = self.client.get(
+            reverse(
+                "my-workspace-invitation-list",
             )
+        )
 
-            self.assertEqual(
-                len(response.data),
-                1,
-            )
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
 
-            self.assertEqual(
-                response.data[0]["id"],
-                invitation.id,
-            )
+        self.assertEqual(
+            response.data,
+            [],
+        )
 
-            self.assertEqual(
-                response.data[0]["workspace"],
-                workspace.id,
-            )
+    def test_workspace_invitation_list_does_not_create_n_plus_one_queries(self):
+        workspace = create_workspace(
+            name="Invitation Performance",
+            slug="invitation-performance",
+            user=self.user,
+        )
 
-            self.assertEqual(
-                response.data[0]["workspace_name"],
-                workspace.name,
-            )
-
-        def test_user_cannot_see_invitation_for_another_email(self):
-            workspace = create_workspace(
-                name="Acme Development",
-                slug="acme-development",
-                user=self.user,
-            )
-
+        for number in range(10):
             create_workspace_invitation(
                 workspace=workspace,
-                email="someone@example.com",
+                email=f"invite-{number}@example.com",
                 invited_by=self.user,
                 role=WorkspaceMembership.Role.MEMBER,
             )
 
-            self.client.force_authenticate(
-                user=self.other_user,
-            )
+        url = reverse(
+            "workspace-invitation-list-create",
+            kwargs={
+                "workspace_id": workspace.id,
+            },
+        )
 
+        with CaptureQueriesContext(
+            connection,
+        ) as queries:
             response = self.client.get(
-                reverse(
-                    "my-workspace-invitation-list",
-                )
+                url,
             )
 
-            self.assertEqual(
-                response.status_code,
-                status.HTTP_200_OK,
-            )
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
 
-            self.assertEqual(
-                response.data,
-                [],
-            )
+        self.assertEqual(
+            len(response.data),
+            10,
+        )
+
+        self.assertLessEqual(
+            len(queries),
+            4,
+            msg=(
+                f"Workspace invitation list uses too many SQL queries: {len(queries)}"
+            ),
+        )
 
 
 class CreateWorkspaceInvitationServiceTests(TestCase):
