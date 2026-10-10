@@ -389,70 +389,6 @@ function ChannelChat({
     );
 
 
-  const ensureMembership =
-    useCallback(
-      async () => {
-        const membersResponse =
-          await apiRequest(
-            `/api/channels/${channel.id}/members/`,
-          );
-
-        if (!membersResponse.ok) {
-          throw new Error(
-            await readApiError(
-              membersResponse,
-              "Unable to check channel membership.",
-            ),
-          );
-        }
-
-        const members =
-          await membersResponse.json();
-
-        const isMember =
-          members.some(
-            (membership) =>
-              membership.user_id ===
-              user.id,
-          );
-
-        if (isMember) {
-          return;
-        }
-
-        if (
-          channel.type !== "PUBLIC"
-        ) {
-          throw new Error(
-            "You are not a member of this private channel.",
-          );
-        }
-
-        const joinResponse =
-          await apiRequest(
-            `/api/channels/${channel.id}/join/`,
-            {
-              method: "POST",
-            },
-          );
-
-        if (!joinResponse.ok) {
-          throw new Error(
-            await readApiError(
-              joinResponse,
-              "Unable to join channel.",
-            ),
-          );
-        }
-      },
-      [
-        channel.id,
-        channel.type,
-        user.id,
-      ],
-    );
-
-
   const loadWorkspaceMembers =
     useCallback(
       async () => {
@@ -820,12 +756,6 @@ function ChannelChat({
 
     async function prepareChannel() {
       try {
-        await ensureMembership();
-
-        if (cancelled) {
-          return;
-        }
-
         await Promise.all([
           loadHistory(),
           loadWorkspaceMembers(),
@@ -909,7 +839,6 @@ function ChannelChat({
   }, [
     channel.id,
     connectSocket,
-    ensureMembership,
     loadHistory,
     loadWorkspaceMembers,
   ]);

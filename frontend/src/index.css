@@ -5155,3 +5155,196 @@ button.cancel:hover {
   margin: 0;
   transform: none;
 }
+
+/* Explicit public channel join */
+
+.channel-access-state {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #75839a;
+  font-size: 11px;
+}
+
+
+.channel-join-view {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  padding: 40px;
+}
+
+
+.channel-join-card {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  width:
+    min(470px, 100%);
+  padding:
+    42px 40px;
+  border:
+    1px solid #25334a;
+  border-radius: 16px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(
+        27,
+        39,
+        61,
+        0.75
+      ),
+      rgba(
+        14,
+        23,
+        38,
+        0.92
+      )
+    );
+  box-shadow:
+    0 22px 65px
+    rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+
+.channel-join-icon {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin-bottom: 19px;
+  border:
+    1px solid #344560;
+  border-radius: 16px;
+  background:
+    #18243a;
+  color: #8896ff;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+
+.channel-join-eyebrow {
+  color: #68778e;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+
+.channel-join-card h2 {
+  margin:
+    7px 0 10px;
+  color: #eef1f7;
+  font-size: 25px;
+  letter-spacing:
+    -0.025em;
+}
+
+
+.channel-join-card > p {
+  max-width: 360px;
+  margin: 0;
+  color: #7e8ba0;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+
+.channel-join-button {
+  min-width: 130px;
+  height: 38px;
+  margin-top: 25px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      135deg,
+      #596cf5,
+      #4558df
+    );
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+
+.channel-join-button:hover {
+  filter: brightness(1.08);
+}
+
+
+.channel-join-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+
+.channel-join-note {
+  max-width: 330px;
+  margin-top: 12px;
+  color: #59677d;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+
+.channel-join-error {
+  width: 100%;
+  margin-top: 18px;
+  padding:
+    9px 11px;
+  border:
+    1px solid
+    rgba(
+      248,
+      113,
+      113,
+      0.18
+    );
+  border-radius: 7px;
+  background:
+    rgba(
+      127,
+      29,
+      29,
+      0.12
+    );
+  color: #efa0aa;
+  font-size: 9px;
+}
+
+
+.channel-join-restricted {
+  max-width: 350px;
+  margin-top: 22px;
+  padding:
+    11px 13px;
+  border:
+    1px solid #303c51;
+  border-radius: 8px;
+  background: #131d2d;
+  color: #8290a5;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+
+@media (max-width: 600px) {
+  .channel-join-view {
+    padding: 20px;
+  }
+
+  .channel-join-card {
+    padding:
+      32px 22px;
+  }
+}

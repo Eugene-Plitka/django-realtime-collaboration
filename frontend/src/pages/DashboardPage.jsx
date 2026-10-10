@@ -10,8 +10,8 @@ import {
   readApiError,
 } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import ChannelAccessGate from "../components/ChannelAccessGate";
 import ChannelActionsMenu from "../components/ChannelActionsMenu";
-import ChannelChat from "../components/ChannelChat";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
 import HeaderActivityControls from "../components/HeaderActivityControls";
@@ -1049,7 +1049,7 @@ function DashboardPage() {
           {mainView === "chat" &&
             activeWorkspace &&
             activeChannel && (
-              <ChannelChat
+              <ChannelAccessGate
                 key={activeChannel.id}
                 channel={
                   activeChannel
@@ -1058,6 +1058,9 @@ function DashboardPage() {
                   activeWorkspace
                 }
                 user={user}
+                workspaceRole={
+                  workspaceRole
+                }
                 activityControls={
                   activityControls
                 }
