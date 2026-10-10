@@ -425,6 +425,67 @@ function DashboardPage() {
     setMainView("chat");
   }
 
+  function handleChannelUpdated(
+    updatedChannel,
+  ) {
+    setChannels(
+      (currentChannels) =>
+        sortChannels(
+          currentChannels.map(
+            (channel) =>
+              channel.id ===
+              updatedChannel.id
+                ? updatedChannel
+                : channel,
+          ),
+        ),
+    );
+
+    setActiveChannel(
+      (currentChannel) =>
+        currentChannel?.id ===
+        updatedChannel.id
+          ? updatedChannel
+          : currentChannel,
+    );
+  }
+
+  function handleChannelDeleted(
+    deletedChannel,
+  ) {
+    const remainingChannels =
+      channels.filter(
+        (channel) =>
+          channel.id !==
+          deletedChannel.id,
+      );
+
+    setChannels(
+      remainingChannels,
+    );
+
+    if (
+      activeChannel?.id !==
+      deletedChannel.id
+    ) {
+      return;
+    }
+
+    const nextChannel =
+      remainingChannels.find(
+        (channel) =>
+          channel.is_general,
+      ) ??
+      remainingChannels[0] ??
+      null;
+
+    setActiveChannel(
+      nextChannel,
+    );
+
+    setMainView("chat");
+  }
+
   async function handleLeftChannel(
     channel,
   ) {
@@ -818,6 +879,12 @@ function DashboardPage() {
                                     onLeftChannel={
                                       handleLeftChannel
                                     }
+                                    onChannelUpdated={
+                                      handleChannelUpdated
+                                    }
+                                    onChannelDeleted={
+                                      handleChannelDeleted
+                                    }
                                   />
                                 </div>
                               ),
@@ -880,6 +947,12 @@ function DashboardPage() {
                                     }
                                     onLeftChannel={
                                       handleLeftChannel
+                                    }
+                                    onChannelUpdated={
+                                      handleChannelUpdated
+                                    }
+                                    onChannelDeleted={
+                                      handleChannelDeleted
                                     }
                                   />
                                 </div>

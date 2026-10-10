@@ -28,6 +28,8 @@ function ChannelActionsMenu({
   user,
   workspaceRole,
   onLeftChannel,
+  onChannelUpdated,
+  onChannelDeleted,
 }) {
   const [open, setOpen] =
     useState(false);
@@ -62,6 +64,35 @@ function ChannelActionsMenu({
   ] = useState(false);
 
   const [
+    savingChannel,
+    setSavingChannel,
+  ] = useState(false);
+
+  const [
+    deletingChannel,
+    setDeletingChannel,
+  ] = useState(false);
+
+  const [
+    deleteConfirmation,
+    setDeleteConfirmation,
+  ] = useState(false);
+
+  const [
+    editName,
+    setEditName,
+  ] = useState(
+    channel.name,
+  );
+
+  const [
+    editDescription,
+    setEditDescription,
+  ] = useState(
+    channel.description ?? "",
+  );
+
+  const [
     popupPosition,
     setPopupPosition,
   ] = useState({
@@ -79,9 +110,13 @@ function ChannelActionsMenu({
     useRef(null);
 
 
-  const canManageMembers =
+  const canManageChannel =
     workspaceRole === "OWNER" ||
     workspaceRole === "ADMIN";
+
+
+  const canManageMembers =
+    canManageChannel;
 
 
   const currentMembership =
@@ -258,6 +293,20 @@ function ChannelActionsMenu({
 
 
   useEffect(() => {
+    setEditName(
+      channel.name,
+    );
+
+    setEditDescription(
+      channel.description ?? "",
+    );
+  }, [
+    channel.name,
+    channel.description,
+  ]);
+
+
+  useEffect(() => {
     function handleOutsideClick(
       event,
     ) {
@@ -277,6 +326,9 @@ function ChannelActionsMenu({
       ) {
         setOpen(false);
         setView("menu");
+        setDeleteConfirmation(
+          false,
+        );
       }
     }
 
@@ -350,6 +402,7 @@ function ChannelActionsMenu({
 
     setView("menu");
     setError("");
+    setDeleteConfirmation(false);
   }
 
 
@@ -357,6 +410,123 @@ function ChannelActionsMenu({
     setOpen(false);
     setView("menu");
     setError("");
+    setDeleteConfirmation(false);
+  }
+
+
+  function openEditView() {
+    setEditName(
+      channel.name,
+    );
+
+    setEditDescription(
+      channel.description ?? "",
+    );
+
+    setError("");
+    setDeleteConfirmation(false);
+    setView("edit");
+  }
+
+
+  async function saveChannel() {
+    const name =
+      editName.trim();
+
+    const description =
+      editDescription.trim();
+
+    if (!name) {
+      setError(
+        "Channel name is required.",
+      );
+      return;
+    }
+
+    setSavingChannel(true);
+    setError("");
+
+    try {
+      const response =
+        await apiRequest(
+          `/api/channels/${channel.id}/`,
+          {
+            method: "PATCH",
+            body: {
+              name,
+              description,
+            },
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(
+            response,
+            "Unable to update channel.",
+          ),
+        );
+      }
+
+      const updatedChannel =
+        await response.json();
+
+      onChannelUpdated(
+        updatedChannel,
+      );
+
+      setView("menu");
+    } catch (requestError) {
+      setError(
+        requestError.message,
+      );
+    } finally {
+      setSavingChannel(false);
+    }
+  }
+
+
+  async function deleteChannel() {
+    if (
+      channel.is_general ||
+      deletingChannel
+    ) {
+      return;
+    }
+
+    setDeletingChannel(true);
+    setError("");
+
+    try {
+      const response =
+        await apiRequest(
+          `/api/channels/${channel.id}/`,
+          {
+            method: "DELETE",
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(
+            response,
+            "Unable to delete channel.",
+          ),
+        );
+      }
+
+      closeMenu();
+
+      await onChannelDeleted(
+        channel,
+      );
+    } catch (requestError) {
+      setError(
+        requestError.message,
+      );
+    } finally {
+      setDeletingChannel(false);
+    }
   }
 
 
@@ -581,6 +751,19 @@ function ChannelActionsMenu({
                     </button>
                   )}
 
+                {canManageChannel && (
+                  <button
+                    type="button"
+                    onClick={
+                      openEditView
+                    }
+                  >
+                    <span>
+                      Edit channel
+                    </span>
+                  </button>
+                )}
+
                 {currentMembership &&
                   !channel.is_general && (
                     <button
@@ -598,6 +781,180 @@ function ChannelActionsMenu({
                       </span>
                     </button>
                   )}
+
+                {canManageChannel &&
+                  !channel.is_general &&
+                  !deleteConfirmation && (
+                    <button
+                      className="danger"
+                      type="button"
+                      onClick={() =>
+                        setDeleteConfirmation(
+                          true,
+                        )
+                      }
+                    >
+                      <span>
+                        Delete channel
+                      </span>
+                    </button>
+                  )}
+
+                {canManageChannel &&
+                  !channel.is_general &&
+                  deleteConfirmation && (
+                    <div className="channel-delete-confirmation">
+                      <span>
+                        Delete channel?
+                      </span>
+
+                      <div>
+                        <button
+                          className="confirm"
+                          type="button"
+                          disabled={
+                            deletingChannel
+                          }
+                          title="Confirm delete"
+                          onClick={
+                            deleteChannel
+                          }
+                        >
+                          ✓
+                        </button>
+
+                        <button
+                          className="cancel"
+                          type="button"
+                          disabled={
+                            deletingChannel
+                          }
+                          title="Cancel delete"
+                          onClick={() =>
+                            setDeleteConfirmation(
+                              false,
+                            )
+                          }
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  )}
+              </div>
+            </>
+          )}
+
+          {view === "edit" && (
+            <>
+              <div className="channel-actions-heading">
+                <button
+                  className="channel-actions-back"
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    setView("menu");
+                  }}
+                >
+                  ←
+                </button>
+
+                <div>
+                  <strong>
+                    Edit channel
+                  </strong>
+
+                  <span>
+                    {channel.type ===
+                    "PRIVATE"
+                      ? "Private channel"
+                      : "Public channel"}
+                  </span>
+                </div>
+              </div>
+
+              {error && (
+                <div className="channel-actions-error">
+                  {error}
+                </div>
+              )}
+
+              <div className="channel-edit-form">
+                <label>
+                  <span>
+                    Channel name
+                  </span>
+
+                  <input
+                    type="text"
+                    value={editName}
+                    maxLength={100}
+                    autoFocus
+                    onChange={(event) =>
+                      setEditName(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </label>
+
+                <label>
+                  <span>
+                    Description
+                  </span>
+
+                  <textarea
+                    value={
+                      editDescription
+                    }
+                    rows={4}
+                    onChange={(event) =>
+                      setEditDescription(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </label>
+
+                {channel.is_general && (
+                  <div className="channel-edit-note">
+                    #general is a protected
+                    workspace channel and
+                    cannot be deleted.
+                  </div>
+                )}
+
+                <div className="channel-edit-actions">
+                  <button
+                    className="secondary"
+                    type="button"
+                    disabled={
+                      savingChannel
+                    }
+                    onClick={() => {
+                      setError("");
+                      setView("menu");
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    className="primary"
+                    type="button"
+                    disabled={
+                      savingChannel ||
+                      !editName.trim()
+                    }
+                    onClick={
+                      saveChannel
+                    }
+                  >
+                    {savingChannel
+                      ? "Saving..."
+                      : "Save changes"}
+                  </button>
+                </div>
               </div>
             </>
           )}

@@ -5348,3 +5348,212 @@ button.cancel:hover {
       32px 22px;
   }
 }
+
+/* Channel edit */
+
+.channel-edit-form {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+
+.channel-edit-form label {
+  display: grid;
+  gap: 7px;
+}
+
+
+.channel-edit-form label > span {
+  color: #7b899f;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+
+.channel-edit-form input,
+.channel-edit-form textarea {
+  width: 100%;
+  border:
+    1px solid #2c3a52;
+  border-radius: 8px;
+  outline: none;
+  background: #0e1725;
+  color: #dfe4ed;
+  font: inherit;
+  font-size: 10px;
+}
+
+
+.channel-edit-form input {
+  height: 36px;
+  padding: 0 10px;
+}
+
+
+.channel-edit-form textarea {
+  min-height: 84px;
+  resize: vertical;
+  padding: 10px;
+  line-height: 1.5;
+}
+
+
+.channel-edit-form input:focus,
+.channel-edit-form textarea:focus {
+  border-color: #596bef;
+  box-shadow:
+    0 0 0 3px
+    rgba(
+      89,
+      107,
+      239,
+      0.08
+    );
+}
+
+
+.channel-edit-note {
+  padding: 10px 11px;
+  border:
+    1px solid #303d54;
+  border-radius: 7px;
+  background: #151f2f;
+  color: #75839a;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+
+.channel-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+
+.channel-edit-actions button {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+
+.channel-edit-actions button.secondary {
+  border:
+    1px solid #303e56;
+  background: transparent;
+  color: #8a97aa;
+}
+
+
+.channel-edit-actions button.primary {
+  border: 0;
+  background: #5266ef;
+  color: #fff;
+}
+
+
+.channel-edit-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+/* Inline channel delete confirmation */
+
+.channel-delete-confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 39px;
+  padding:
+    0 6px 0 10px;
+  border-radius: 7px;
+  background:
+    rgba(
+      127,
+      29,
+      29,
+      0.12
+    );
+}
+
+
+.channel-delete-confirmation > span {
+  color: #d894a0;
+  font-size: 9px;
+}
+
+
+.channel-delete-confirmation > div {
+  display: flex;
+  gap: 4px;
+}
+
+
+.channel-delete-confirmation button {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  border:
+    1px solid #3a4658;
+  border-radius: 6px;
+  background: transparent;
+  color: #8490a4;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+
+.channel-delete-confirmation
+button.confirm:hover {
+  border-color:
+    rgba(
+      74,
+      222,
+      128,
+      0.35
+    );
+  background:
+    rgba(
+      34,
+      197,
+      94,
+      0.12
+    );
+  color: #4ade80;
+}
+
+
+.channel-delete-confirmation
+button.cancel:hover {
+  border-color:
+    rgba(
+      248,
+      113,
+      113,
+      0.35
+    );
+  background:
+    rgba(
+      239,
+      68,
+      68,
+      0.12
+    );
+  color: #f87171;
+}
+
+
+.channel-delete-confirmation
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
