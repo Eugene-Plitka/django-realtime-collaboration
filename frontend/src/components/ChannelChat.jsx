@@ -137,6 +137,29 @@ function ChannelChat({
   const [sending, setSending] =
     useState(false);
 
+  const [
+    workspaceRole,
+    setWorkspaceRole,
+  ] = useState(null);
+
+  const [
+    typingUsers,
+    setTypingUsers,
+  ] = useState([]);
+
+  const [
+    editingMessageId,
+    setEditingMessageId,
+  ] = useState(null);
+
+  const [editText, setEditText] =
+    useState("");
+
+  const [
+    pendingDeleteMessageId,
+    setPendingDeleteMessageId,
+  ] = useState(null);
+
   const socketRef =
     useRef(null);
 
@@ -146,11 +169,73 @@ function ChannelChat({
   const reconnectAllowedRef =
     useRef(true);
 
+  const typingTimerRef =
+    useRef(null);
+
+  const typingActiveRef =
+    useRef(false);
+
   const bottomRef =
     useRef(null);
 
   const shouldScrollRef =
     useRef(true);
+
+
+  const sendSocketEvent =
+    useCallback(
+      (type, data = {}) => {
+        const socket =
+          socketRef.current;
+
+        if (
+          !socket ||
+          socket.readyState !==
+            WebSocket.OPEN
+        ) {
+          return false;
+        }
+
+        socket.send(
+          JSON.stringify({
+            type,
+            data,
+          }),
+        );
+
+        return true;
+      },
+      [],
+    );
+
+
+  const stopTyping =
+    useCallback(
+      () => {
+        if (
+          typingTimerRef.current
+        ) {
+          window.clearTimeout(
+            typingTimerRef.current,
+          );
+
+          typingTimerRef.current =
+            null;
+        }
+
+        if (
+          typingActiveRef.current
+        ) {
+          sendSocketEvent(
+            "typing.stop",
+          );
+
+          typingActiveRef.current =
+            false;
+        }
+      },
+      [sendSocketEvent],
+    );
 
 
   const ensureMembership =
@@ -212,6 +297,44 @@ function ChannelChat({
       [
         channel.id,
         channel.type,
+        user.id,
+      ],
+    );
+
+
+  const loadWorkspaceRole =
+    useCallback(
+      async () => {
+        const response =
+          await apiRequest(
+            `/api/workspaces/${workspace.id}/members/`,
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            await readApiError(
+              response,
+              "Unable to load workspace role.",
+            ),
+          );
+        }
+
+        const members =
+          await response.json();
+
+        const membership =
+          members.find(
+            (member) =>
+              member.user_id ===
+              user.id,
+          );
+
+        setWorkspaceRole(
+          membership?.role ?? null,
+        );
+      },
+      [
+        workspace.id,
         user.id,
       ],
     );
@@ -280,9 +403,11 @@ function ChannelChat({
             );
         } catch (connectionError) {
           setSocketStatus("error");
+
           setChatError(
             connectionError.message,
           );
+
           return;
         }
 
@@ -340,6 +465,62 @@ function ChannelChat({
                 ),
             );
 
+            if (
+              payload.type ===
+              "message.deleted"
+            ) {
+              setPendingDeleteMessageId(
+                (currentId) =>
+                  currentId ===
+                  payload.data.id
+                    ? null
+                    : currentId,
+              );
+            }
+
+            return;
+          }
+
+          if (
+            payload.type ===
+            "typing.started"
+          ) {
+            setTypingUsers(
+              (currentUsers) => {
+                const exists =
+                  currentUsers.some(
+                    (typingUser) =>
+                      typingUser.user_id ===
+                      payload.data.user_id,
+                  );
+
+                if (exists) {
+                  return currentUsers;
+                }
+
+                return [
+                  ...currentUsers,
+                  payload.data,
+                ];
+              },
+            );
+
+            return;
+          }
+
+          if (
+            payload.type ===
+            "typing.stopped"
+          ) {
+            setTypingUsers(
+              (currentUsers) =>
+                currentUsers.filter(
+                  (typingUser) =>
+                    typingUser.user_id !==
+                    payload.data.user_id,
+                ),
+            );
+
             return;
           }
 
@@ -370,6 +551,8 @@ function ChannelChat({
               socketRef.current =
                 null;
             }
+
+            setTypingUsers([]);
 
             if (
               !reconnectAllowedRef.current
@@ -423,9 +606,7 @@ function ChannelChat({
               );
           };
       },
-      [
-        channel.id,
-      ],
+      [channel.id],
     );
 
 
@@ -439,7 +620,16 @@ function ChannelChat({
     setNextPage(null);
     setComposer("");
     setChatError("");
+    setTypingUsers([]);
+    setWorkspaceRole(null);
+    setEditingMessageId(null);
+    setEditText("");
+    setPendingDeleteMessageId(
+      null,
+    );
+
     setHistoryLoading(true);
+
     setSocketStatus(
       "connecting",
     );
@@ -452,7 +642,10 @@ function ChannelChat({
           return;
         }
 
-        await loadHistory();
+        await Promise.all([
+          loadHistory(),
+          loadWorkspaceRole(),
+        ]);
 
         if (cancelled) {
           return;
@@ -497,8 +690,23 @@ function ChannelChat({
           null;
       }
 
+      if (
+        typingTimerRef.current
+      ) {
+        window.clearTimeout(
+          typingTimerRef.current,
+        );
+
+        typingTimerRef.current =
+          null;
+      }
+
+      typingActiveRef.current =
+        false;
+
       if (socketRef.current) {
         socketRef.current.close();
+
         socketRef.current =
           null;
       }
@@ -508,6 +716,7 @@ function ChannelChat({
     connectSocket,
     ensureMembership,
     loadHistory,
+    loadWorkspaceRole,
   ]);
 
 
@@ -583,6 +792,55 @@ function ChannelChat({
   }
 
 
+  function handleComposerChange(
+    event,
+  ) {
+    const value =
+      event.target.value;
+
+    setComposer(value);
+
+    if (
+      socketStatus !==
+      "connected"
+    ) {
+      return;
+    }
+
+    if (!value.trim()) {
+      stopTyping();
+      return;
+    }
+
+    if (
+      !typingActiveRef.current
+    ) {
+      sendSocketEvent(
+        "typing.start",
+      );
+
+      typingActiveRef.current =
+        true;
+    }
+
+    if (
+      typingTimerRef.current
+    ) {
+      window.clearTimeout(
+        typingTimerRef.current,
+      );
+    }
+
+    typingTimerRef.current =
+      window.setTimeout(
+        () => {
+          stopTyping();
+        },
+        1200,
+      );
+  }
+
+
   function sendMessage() {
     const text =
       composer.trim();
@@ -591,13 +849,13 @@ function ChannelChat({
       return;
     }
 
-    const socket =
-      socketRef.current;
-
     if (
-      !socket ||
-      socket.readyState !==
-        WebSocket.OPEN
+      !sendSocketEvent(
+        "message.create",
+        {
+          text,
+        },
+      )
     ) {
       setChatError(
         "Chat connection is not ready yet.",
@@ -609,28 +867,25 @@ function ChannelChat({
     setSending(true);
     setChatError("");
 
-    try {
-      socket.send(
-        JSON.stringify({
-          type: "message.create",
-          data: {
-            text,
-          },
-        }),
-      );
+    stopTyping();
 
-      setComposer("");
+    setComposer("");
 
-      shouldScrollRef.current =
-        true;
-    } finally {
-      setSending(false);
-    }
+    shouldScrollRef.current =
+      true;
+
+    window.setTimeout(
+      () => {
+        setSending(false);
+      },
+      150,
+    );
   }
 
 
   function handleSubmit(event) {
     event.preventDefault();
+
     sendMessage();
   }
 
@@ -643,9 +898,160 @@ function ChannelChat({
       !event.shiftKey
     ) {
       event.preventDefault();
+
       sendMessage();
     }
   }
+
+
+  function startEditing(message) {
+    setPendingDeleteMessageId(
+      null,
+    );
+
+    setEditingMessageId(
+      message.id,
+    );
+
+    setEditText(
+      message.text ?? "",
+    );
+  }
+
+
+  function cancelEditing() {
+    setEditingMessageId(null);
+    setEditText("");
+  }
+
+
+  function saveEditedMessage(
+    messageId,
+  ) {
+    const text =
+      editText.trim();
+
+    if (!text) {
+      return;
+    }
+
+    if (
+      !sendSocketEvent(
+        "message.update",
+        {
+          message_id:
+            messageId,
+          text,
+        },
+      )
+    ) {
+      setChatError(
+        "Chat connection is not ready yet.",
+      );
+
+      return;
+    }
+
+    cancelEditing();
+  }
+
+
+  function handleEditKeyDown(
+    event,
+    messageId,
+  ) {
+    if (
+      event.key === "Escape"
+    ) {
+      cancelEditing();
+      return;
+    }
+
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+
+      saveEditedMessage(
+        messageId,
+      );
+    }
+  }
+
+
+  function requestDeleteMessage(
+    messageId,
+  ) {
+    setEditingMessageId(null);
+    setEditText("");
+
+    setPendingDeleteMessageId(
+      messageId,
+    );
+  }
+
+
+  function cancelDeleteMessage() {
+    setPendingDeleteMessageId(
+      null,
+    );
+  }
+
+
+  function confirmDeleteMessage(
+    message,
+  ) {
+    if (
+      !sendSocketEvent(
+        "message.delete",
+        {
+          message_id:
+            message.id,
+        },
+      )
+    ) {
+      setChatError(
+        "Chat connection is not ready yet.",
+      );
+
+      return;
+    }
+
+    setPendingDeleteMessageId(
+      null,
+    );
+  }
+
+
+  function canDeleteMessage(
+    message,
+  ) {
+    if (message.is_deleted) {
+      return false;
+    }
+
+    if (
+      message.author === user.id
+    ) {
+      return true;
+    }
+
+    return (
+      workspaceRole === "OWNER" ||
+      workspaceRole === "ADMIN"
+    );
+  }
+
+
+  const visibleTypingUsers =
+    typingUsers.slice(0, 3);
+
+  const hiddenTypingCount =
+    Math.max(
+      typingUsers.length - 3,
+      0,
+    );
 
 
   return (
@@ -796,6 +1202,14 @@ function ChannelChat({
                     message.author ===
                     user.id;
 
+                  const isEditing =
+                    editingMessageId ===
+                    message.id;
+
+                  const isDeletePending =
+                    pendingDeleteMessageId ===
+                    message.id;
+
                   return (
                     <article
                       className={[
@@ -855,12 +1269,139 @@ function ChannelChat({
                           <p className="deleted-message-text">
                             Message deleted
                           </p>
+                        ) : isEditing ? (
+                          <div className="message-edit-box">
+                            <textarea
+                              value={
+                                editText
+                              }
+                              onChange={(
+                                event,
+                              ) =>
+                                setEditText(
+                                  event
+                                    .target
+                                    .value,
+                                )
+                              }
+                              onKeyDown={(
+                                event,
+                              ) =>
+                                handleEditKeyDown(
+                                  event,
+                                  message.id,
+                                )
+                              }
+                              rows={2}
+                              autoFocus
+                            />
+
+                            <div className="message-edit-actions">
+                              <span>
+                                Esc to cancel ·
+                                Enter to save
+                              </span>
+
+                              <button
+                                className="message-action-cancel"
+                                type="button"
+                                onClick={
+                                  cancelEditing
+                                }
+                              >
+                                Cancel
+                              </button>
+
+                              <button
+                                className="message-action-save"
+                                type="button"
+                                disabled={
+                                  !editText.trim()
+                                }
+                                onClick={() =>
+                                  saveEditedMessage(
+                                    message.id,
+                                  )
+                                }
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
                         ) : (
                           <p className="message-text">
                             {message.text}
                           </p>
                         )}
                       </div>
+
+                      {!message.is_deleted &&
+                        !isEditing && (
+                          <div className="message-actions">
+                            {isOwn &&
+                              !isDeletePending && (
+                              <button
+                                type="button"
+                                title="Edit message"
+                                onClick={() =>
+                                  startEditing(
+                                    message,
+                                  )
+                                }
+                              >
+                                Edit
+                              </button>
+                            )}
+
+                            {canDeleteMessage(
+                              message,
+                            ) &&
+                              !isDeletePending && (
+                              <button
+                                className="danger"
+                                type="button"
+                                title="Delete message"
+                                onClick={() =>
+                                  requestDeleteMessage(
+                                    message.id,
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
+                            )}
+
+                            {isDeletePending && (
+                              <div className="message-delete-confirm">
+                                <button
+                                  className="confirm"
+                                  type="button"
+                                  title="Confirm delete"
+                                  aria-label="Confirm delete"
+                                  onClick={() =>
+                                    confirmDeleteMessage(
+                                      message,
+                                    )
+                                  }
+                                >
+                                  ✓
+                                </button>
+
+                                <button
+                                  className="cancel"
+                                  type="button"
+                                  title="Cancel delete"
+                                  aria-label="Cancel delete"
+                                  onClick={
+                                    cancelDeleteMessage
+                                  }
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                     </article>
                   );
                 },
@@ -871,6 +1412,72 @@ function ChannelChat({
               />
             </div>
           )}
+      </div>
+
+      <div className="typing-indicator-row">
+        {typingUsers.length >
+          0 && (
+          <div className="typing-indicator">
+            <span className="typing-dots">
+              <i />
+              <i />
+              <i />
+            </span>
+
+            <div className="typing-users-list">
+              {visibleTypingUsers.map(
+                (
+                  typingUser,
+                  index,
+                ) => (
+                  <span
+                    className="typing-user"
+                    key={
+                      typingUser.user_id
+                    }
+                  >
+                    <strong>
+                      {
+                        typingUser.username
+                      }
+                    </strong>
+
+                    {" is typing..."}
+
+                    {(
+                      index <
+                        visibleTypingUsers.length -
+                          1 ||
+                      hiddenTypingCount >
+                        0
+                    ) && (
+                      <b>
+                        /
+                      </b>
+                    )}
+                  </span>
+                ),
+              )}
+
+              {hiddenTypingCount >
+                0 && (
+                <span className="typing-user typing-more">
+                  <strong>
+                    +
+                    {
+                      hiddenTypingCount
+                    }
+                  </strong>
+
+                  {hiddenTypingCount ===
+                  1
+                    ? " member is typing..."
+                    : " members are typing..."}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {chatError && (
@@ -897,10 +1504,8 @@ function ChannelChat({
       >
         <textarea
           value={composer}
-          onChange={(event) =>
-            setComposer(
-              event.target.value,
-            )
+          onChange={
+            handleComposerChange
           }
           onKeyDown={
             handleComposerKeyDown
