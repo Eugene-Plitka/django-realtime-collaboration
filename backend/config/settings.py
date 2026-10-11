@@ -190,6 +190,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "accounts.context_processors.frontend_urls",
             ],
         },
     },
@@ -298,9 +299,14 @@ if GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET:
     }
 
 
+FRONTEND_BASE_URL = os.environ.get(
+    "FRONTEND_BASE_URL",
+    "http://localhost:5173",
+).rstrip("/")
+
 LOGIN_REDIRECT_URL = os.environ.get(
     "SOCIAL_LOGIN_REDIRECT_URL",
-    "http://localhost:5173/auth/social/callback",
+    f"{FRONTEND_BASE_URL}/auth/social/callback",
 )
 
 # Password validation
