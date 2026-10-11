@@ -5,7 +5,6 @@ import {
 } from "react";
 
 import {
-  Navigate,
   useNavigate,
 } from "react-router-dom";
 
@@ -35,10 +34,6 @@ function SocialCallbackPage() {
 
 
   useEffect(() => {
-    if (user) {
-      return;
-    }
-
     if (exchangeStarted.current) {
       return;
     }
@@ -46,7 +41,7 @@ function SocialCallbackPage() {
     exchangeStarted.current = true;
 
 
-    async function exchangeSessionForJwt() {
+    async function completeSocialFlow() {
       try {
         const csrfResponse =
           await apiRequest(
@@ -58,6 +53,17 @@ function SocialCallbackPage() {
           );
 
         if (!csrfResponse.ok) {
+          if (user) {
+            navigate(
+              "/app",
+              {
+                replace: true,
+              },
+            );
+
+            return;
+          }
+
           throw new Error(
             "Unable to initialize social authentication.",
           );
@@ -67,6 +73,17 @@ function SocialCallbackPage() {
           getCookie("csrftoken");
 
         if (!csrfToken) {
+          if (user) {
+            navigate(
+              "/app",
+              {
+                replace: true,
+              },
+            );
+
+            return;
+          }
+
           throw new Error(
             "CSRF token was not created.",
           );
@@ -80,12 +97,24 @@ function SocialCallbackPage() {
               skipAuth: true,
               credentials: "include",
               headers: {
-                "X-CSRFToken": csrfToken,
+                "X-CSRFToken":
+                  csrfToken,
               },
             },
           );
 
         if (!response.ok) {
+          if (user) {
+            navigate(
+              "/app",
+              {
+                replace: true,
+              },
+            );
+
+            return;
+          }
+
           throw new Error(
             await readApiError(
               response,
@@ -115,22 +144,12 @@ function SocialCallbackPage() {
     }
 
 
-    exchangeSessionForJwt();
+    completeSocialFlow();
   }, [
     loadUser,
     navigate,
     user,
   ]);
-
-
-  if (user) {
-    return (
-      <Navigate
-        to="/app"
-        replace
-      />
-    );
-  }
 
 
   return (

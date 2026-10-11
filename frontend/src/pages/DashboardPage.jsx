@@ -10,6 +10,7 @@ import {
   readApiError,
 } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import AccountConnectionsLauncher from "../components/AccountConnectionsLauncher";
 import ChannelAccessGate from "../components/ChannelAccessGate";
 import ChannelActionsMenu from "../components/ChannelActionsMenu";
 import CreateChannelModal from "../components/CreateChannelModal";
@@ -968,31 +969,10 @@ function DashboardPage() {
           )}
 
           <div className="channel-sidebar-footer">
-            <div className="dashboard-user">
-              <div className="dashboard-avatar">
-                {user.username
-                  .slice(0, 1)
-                  .toUpperCase()}
-              </div>
-
-              <div>
-                <strong>
-                  {user.username}
-                </strong>
-
-                <span>
-                  {user.email}
-                </span>
-              </div>
-            </div>
-
-            <button
-              className="logout-button"
-              type="button"
-              onClick={logout}
-            >
-              Sign out
-            </button>
+            <AccountConnectionsLauncher
+              user={user}
+              logout={logout}
+            />
           </div>
         </section>
 

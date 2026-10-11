@@ -5601,3 +5601,452 @@ button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* Account connections */
+
+.account-connections-button {
+  width: 100%;
+  height: 36px;
+  margin-top: 10px;
+
+  border:
+    1px solid #29364d;
+  border-radius: 8px;
+
+  background: #111a29;
+  color: #9da9bc;
+
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 650;
+
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.account-connections-button:hover {
+  transform: translateY(-1px);
+  border-color: #4d5f87;
+  background: #172237;
+  color: #dce2ee;
+}
+
+
+.account-connections-backdrop {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+
+  display: grid;
+  place-items: center;
+
+  padding: 22px;
+
+  background:
+    rgba(3, 7, 13, 0.72);
+
+  backdrop-filter: blur(6px);
+}
+
+
+.account-connections-modal {
+  width: min(650px, 100%);
+  max-height: min(760px, calc(100vh - 44px));
+  overflow-y: auto;
+
+  border:
+    1px solid #2a3850;
+  border-radius: 17px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #111a29,
+      #0d1522
+    );
+
+  box-shadow:
+    0 32px 100px
+    rgba(0, 0, 0, 0.58);
+}
+
+
+.account-connections-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+
+  padding: 23px 24px 21px;
+
+  border-bottom:
+    1px solid #222f43;
+}
+
+
+.account-connections-header > div {
+  min-width: 0;
+}
+
+
+.account-connections-header span {
+  color: #8290ff;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+
+.account-connections-header h2 {
+  margin: 6px 0 6px;
+
+  color: #eef2f8;
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+
+
+.account-connections-header p {
+  max-width: 470px;
+  margin: 0;
+
+  color: #78869b;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+
+.account-connections-header > button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 7px;
+
+  background: transparent;
+  color: #76849a;
+
+  cursor: pointer;
+  font-size: 20px;
+}
+
+
+.account-connections-header > button:hover {
+  background: #1a2538;
+  color: #d5dbe6;
+}
+
+
+.account-connections-error {
+  margin: 15px 20px 0;
+  padding: 10px 12px;
+
+  border:
+    1px solid
+    rgba(248, 113, 113, 0.22);
+  border-radius: 8px;
+
+  background:
+    rgba(127, 29, 29, 0.14);
+
+  color: #efa0aa;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+
+.account-connections-loading {
+  padding: 45px 24px;
+
+  color: #75839a;
+  font-size: 11px;
+  text-align: center;
+}
+
+
+.account-login-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin: 18px 20px 0;
+  padding: 13px 14px;
+
+  border:
+    1px solid #27354c;
+  border-radius: 10px;
+
+  background: #101927;
+}
+
+
+.account-login-summary div {
+  display: grid;
+  gap: 3px;
+}
+
+
+.account-login-summary span:first-child {
+  color: #6d7b91;
+  font-size: 9px;
+}
+
+
+.account-login-summary strong {
+  color: #cbd3e0;
+  font-size: 11px;
+}
+
+
+.account-provider-list {
+  display: grid;
+  gap: 10px;
+
+  padding: 18px 20px 0;
+}
+
+
+.account-provider-row {
+  display: grid;
+  grid-template-columns:
+    46px
+    minmax(0, 1fr)
+    auto
+    auto;
+
+  align-items: center;
+  gap: 12px;
+
+  min-height: 76px;
+  padding: 12px 13px;
+
+  border:
+    1px solid #27354b;
+  border-radius: 11px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #131d2d,
+      #101827
+    );
+}
+
+
+.account-provider-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+
+  border:
+    1px solid #33415a;
+  border-radius: 11px;
+
+  background: #0d1624;
+}
+
+
+.account-provider-icon
+.social-provider-logo {
+  width: 25px;
+  height: 25px;
+}
+
+
+.account-provider-copy {
+  min-width: 0;
+}
+
+
+.account-provider-copy strong,
+.account-provider-copy span {
+  display: block;
+}
+
+
+.account-provider-copy strong {
+  color: #e0e5ee;
+  font-size: 11px;
+}
+
+
+.account-provider-copy span {
+  margin-top: 4px;
+
+  color: #718097;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+
+.connection-status {
+  padding: 5px 7px;
+
+  border:
+    1px solid #354158;
+  border-radius: 999px;
+
+  color: #77849a;
+  font-size: 8px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+
+.connection-status.connected {
+  border-color:
+    rgba(74, 222, 128, 0.23);
+
+  background:
+    rgba(34, 197, 94, 0.08);
+
+  color: #68d893;
+}
+
+
+.connection-action {
+  min-width: 82px;
+  height: 32px;
+  padding: 0 11px;
+
+  border-radius: 7px;
+
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 700;
+
+  transition:
+    transform 130ms ease,
+    border-color 130ms ease,
+    background 130ms ease;
+}
+
+
+.connection-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+
+.connection-action.connect {
+  border: 0;
+
+  background:
+    linear-gradient(
+      135deg,
+      #596cf5,
+      #4558df
+    );
+
+  color: #fff;
+}
+
+
+.connection-action.disconnect {
+  border:
+    1px solid #4c3541;
+
+  background: transparent;
+  color: #d18d99;
+}
+
+
+.connection-action.disconnect:hover {
+  border-color: #81505d;
+
+  background:
+    rgba(127, 29, 29, 0.12);
+}
+
+
+.connection-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+
+.connection-confirm {
+  display: flex;
+  gap: 5px;
+}
+
+
+.connection-confirm button {
+  height: 32px;
+  padding: 0 9px;
+
+  border-radius: 7px;
+
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+
+.connection-confirm .cancel {
+  border:
+    1px solid #354259;
+
+  background: transparent;
+  color: #8b98ab;
+}
+
+
+.connection-confirm .confirm {
+  border:
+    1px solid
+    rgba(248, 113, 113, 0.28);
+
+  background:
+    rgba(127, 29, 29, 0.18);
+
+  color: #f19aa7;
+}
+
+
+.connection-confirm button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+.account-connections-note {
+  margin: 18px 20px 20px;
+  padding: 11px 13px;
+
+  border:
+    1px solid #27364c;
+  border-radius: 9px;
+
+  background: #101927;
+
+  color: #69778e;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+
+@media (max-width: 680px) {
+  .account-provider-row {
+    grid-template-columns:
+      42px
+      minmax(0, 1fr);
+  }
+
+  .connection-status,
+  .connection-action,
+  .connection-confirm {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

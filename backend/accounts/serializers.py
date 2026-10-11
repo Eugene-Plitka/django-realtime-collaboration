@@ -58,3 +58,31 @@ class SocialJWTExchangeResponseSerializer(serializers.Serializer):
     access = serializers.CharField(
         read_only=True,
     )
+
+
+class SocialProviderStatusSerializer(serializers.Serializer):
+    provider = serializers.CharField(
+        read_only=True,
+    )
+    name = serializers.CharField(
+        read_only=True,
+    )
+    connected = serializers.BooleanField(
+        read_only=True,
+    )
+
+
+class SocialConnectionListSerializer(serializers.Serializer):
+    password_login_available = serializers.BooleanField(
+        read_only=True,
+    )
+    providers = SocialProviderStatusSerializer(
+        many=True,
+        read_only=True,
+    )
+
+
+class SocialConnectResponseSerializer(serializers.Serializer):
+    redirect_url = serializers.CharField(
+        read_only=True,
+    )

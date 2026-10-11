@@ -8,10 +8,12 @@ from .views import (
     LogoutView,
     MeView,
     RegisterView,
+    SocialConnectionListView,
+    SocialConnectStartView,
+    SocialDisconnectView,
     SocialJWTExchangeView,
     csrf_cookie_view,
 )
-
 
 urlpatterns = [
     path(
@@ -48,5 +50,20 @@ urlpatterns = [
         "social/exchange/",
         SocialJWTExchangeView.as_view(),
         name="social-jwt-exchange",
+    ),
+    path(
+        "social/connections/",
+        SocialConnectionListView.as_view(),
+        name="social-connection-list",
+    ),
+    path(
+        "social/connections/<str:provider>/connect/",
+        SocialConnectStartView.as_view(),
+        name="social-connect-start",
+    ),
+    path(
+        "social/connections/<str:provider>/",
+        SocialDisconnectView.as_view(),
+        name="social-disconnect",
     ),
 ]

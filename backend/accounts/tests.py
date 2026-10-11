@@ -1,3 +1,4 @@
+from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import SESSION_KEY
 from django.urls import reverse
 from rest_framework import status
@@ -195,4 +196,230 @@ class SocialAuthenticationPreparationTests(APITestCase):
         self.assertNotIn(
             SESSION_KEY,
             self.client.session,
+        )
+
+
+class SocialConnectionManagementTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="connections@example.com",
+            username="connections-user",
+            password="StrongPassword123!",
+        )
+
+        self.client.force_authenticate(
+            user=self.user,
+        )
+
+    def test_connection_list_returns_supported_providers(
+        self,
+    ):
+        SocialAccount.objects.create(
+            user=self.user,
+            provider="google",
+            uid="google-test-user",
+        )
+
+        response = self.client.get(
+            reverse(
+                "social-connection-list",
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertTrue(response.data["password_login_available"])
+
+        providers = {
+            item["provider"]: item["connected"] for item in response.data["providers"]
+        }
+
+        self.assertTrue(providers["google"])
+
+        self.assertFalse(providers["github"])
+
+    def test_connect_start_creates_authenticated_session(
+        self,
+    ):
+        response = self.client.post(
+            reverse(
+                "social-connect-start",
+                kwargs={
+                    "provider": "google",
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["redirect_url"],
+            ("/accounts/google/login/?process=connect"),
+        )
+
+        self.assertIn(
+            SESSION_KEY,
+            self.client.session,
+        )
+
+    def test_connect_start_rejects_already_connected_provider(
+        self,
+    ):
+        SocialAccount.objects.create(
+            user=self.user,
+            provider="google",
+            uid="google-existing-user",
+        )
+
+        response = self.client.post(
+            reverse(
+                "social-connect-start",
+                kwargs={
+                    "provider": "google",
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_disconnect_provider_when_password_is_available(
+        self,
+    ):
+        SocialAccount.objects.create(
+            user=self.user,
+            provider="google",
+            uid="google-disconnect-user",
+        )
+
+        response = self.client.delete(
+            reverse(
+                "social-disconnect",
+                kwargs={
+                    "provider": "google",
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        self.assertFalse(
+            SocialAccount.objects.filter(
+                user=self.user,
+                provider="google",
+            ).exists()
+        )
+
+    def test_last_social_provider_cannot_be_disconnected_without_password(
+        self,
+    ):
+        self.user.set_unusable_password()
+        self.user.save(
+            update_fields=[
+                "password",
+            ]
+        )
+
+        SocialAccount.objects.create(
+            user=self.user,
+            provider="google",
+            uid="google-only-login",
+        )
+
+        response = self.client.delete(
+            reverse(
+                "social-disconnect",
+                kwargs={
+                    "provider": "google",
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.assertTrue(
+            SocialAccount.objects.filter(
+                user=self.user,
+                provider="google",
+            ).exists()
+        )
+
+    def test_social_provider_can_be_disconnected_when_another_provider_exists(
+        self,
+    ):
+        self.user.set_unusable_password()
+        self.user.save(
+            update_fields=[
+                "password",
+            ]
+        )
+
+        google_account = SocialAccount.objects.create(
+            user=self.user,
+            provider="google",
+            uid="google-login",
+        )
+
+        SocialAccount.objects.create(
+            user=self.user,
+            provider="github",
+            uid="github-login",
+        )
+
+        response = self.client.delete(
+            reverse(
+                "social-disconnect",
+                kwargs={
+                    "provider": "google",
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        self.assertFalse(
+            SocialAccount.objects.filter(
+                pk=google_account.pk,
+            ).exists()
+        )
+
+        self.assertTrue(
+            SocialAccount.objects.filter(
+                user=self.user,
+                provider="github",
+            ).exists()
+        )
+
+    def test_unknown_social_provider_returns_not_found(
+        self,
+    ):
+        response = self.client.post(
+            reverse(
+                "social-connect-start",
+                kwargs={
+                    "provider": "unknown",
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
         )
