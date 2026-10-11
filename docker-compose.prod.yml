@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:18
     env_file:
-      - .env
+      - .env.production
     volumes:
       - postgres_data:/var/lib/postgresql
     restart: unless-stopped
@@ -10,7 +10,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"",
         ]
       interval: 10s
       timeout: 5s
@@ -35,14 +35,14 @@ services:
       context: .
       dockerfile: Dockerfile
     command:
-      daphne
-      -b
-      0.0.0.0
-      -p
-      8000
-      config.asgi:application
+      sh
+      -c
+      "python manage.py collectstatic --noinput &&
+      daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     env_file:
-      - .env
+      - .env.production
+    volumes:
+      - static_data:/app/staticfiles
     restart: unless-stopped
     depends_on:
       db:
@@ -73,7 +73,7 @@ services:
       worker
       --loglevel=info
     env_file:
-      - .env
+      - .env.production
     restart: unless-stopped
     depends_on:
       db:
@@ -87,6 +87,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:80"
+    volumes:
+      - static_data:/var/www/static:ro
     restart: unless-stopped
     depends_on:
       web:
@@ -94,3 +96,4 @@ services:
 
 volumes:
   postgres_data:
+  static_data:

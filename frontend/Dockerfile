@@ -8,6 +8,8 @@ RUN npm ci
 
 COPY . .
 
+ENV VITE_API_BASE_URL=""
+
 RUN npm run build
 
 
