@@ -8,3 +8,4 @@ daphne
 celery[redis]
 django-allauth[socialaccount]
 django-cors-headers
+drf-spectacular

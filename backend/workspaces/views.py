@@ -1,5 +1,6 @@
 from accounts.models import User
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -129,6 +130,7 @@ class WorkspaceMemberRoleUpdateView(generics.UpdateAPIView):
 
 
 class WorkspaceMemberRemoveView(generics.DestroyAPIView):
+    serializer_class = WorkspaceMembershipSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
@@ -211,6 +213,12 @@ class WorkspaceTransferOwnershipView(generics.GenericAPIView):
 class WorkspaceLeaveView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={
+            204: None,
+        },
+    )
     def post(self, request, workspace_id):
         try:
             membership = WorkspaceMembership.objects.select_related(
@@ -232,7 +240,9 @@ class WorkspaceLeaveView(generics.GenericAPIView):
             membership=membership,
         )
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            status=status.HTTP_204_NO_CONTENT,
+        )
 
 
 class WorkspaceMemberAddView(generics.GenericAPIView):
@@ -350,6 +360,12 @@ class WorkspaceInvitationCreateView(generics.GenericAPIView):
 class WorkspaceInvitationAcceptView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={
+            201: WorkspaceMembershipSerializer,
+        },
+    )
     def post(self, request, token):
         try:
             membership = accept_workspace_invitation(
@@ -394,7 +410,18 @@ class MyWorkspaceInvitationListView(generics.ListAPIView):
 class WorkspaceInvitationCancelView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, workspace_id, invitation_id):
+    @extend_schema(
+        request=None,
+        responses={
+            204: None,
+        },
+    )
+    def post(
+        self,
+        request,
+        workspace_id,
+        invitation_id,
+    ):
         try:
             invitation = WorkspaceInvitation.objects.select_related("workspace").get(
                 pk=invitation_id,

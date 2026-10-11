@@ -49,3 +49,12 @@ class LogoutSerializer(serializers.Serializer):
 
     def save(self, **kwargs):
         RefreshToken(self.token).blacklist()
+
+
+class SocialJWTExchangeResponseSerializer(serializers.Serializer):
+    refresh = serializers.CharField(
+        read_only=True,
+    )
+    access = serializers.CharField(
+        read_only=True,
+    )

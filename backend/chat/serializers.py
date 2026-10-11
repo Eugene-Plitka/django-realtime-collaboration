@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import (
@@ -71,6 +72,25 @@ class ChannelMemberAddSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
 
 
+class ReplyToMessageSerializer(serializers.Serializer):
+    id = serializers.IntegerField(
+        read_only=True,
+    )
+    author_id = serializers.IntegerField(
+        read_only=True,
+    )
+    author_username = serializers.CharField(
+        read_only=True,
+    )
+    text = serializers.CharField(
+        allow_null=True,
+        read_only=True,
+    )
+    is_deleted = serializers.BooleanField(
+        read_only=True,
+    )
+
+
 class MessageSerializer(serializers.ModelSerializer):
     author_username = serializers.CharField(
         source="author.username",
@@ -108,6 +128,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "is_deleted",
         )
 
+    @extend_schema_field(ReplyToMessageSerializer)
     def get_reply_to_message(self, instance):
         if instance.reply_to_id is None:
             return None

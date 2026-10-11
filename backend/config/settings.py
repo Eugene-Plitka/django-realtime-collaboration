@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "drf_spectacular",
     "corsheaders",
     "channels",
     "allauth",
@@ -78,6 +79,25 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_SCHEMA_CLASS": ("drf_spectacular.openapi.AutoSchema"),
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Realtime Collaboration API",
+    "DESCRIPTION": ("REST API for the Django Realtime Collaboration Platform."),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "ENUM_NAME_OVERRIDES": {
+        "WorkspaceRoleEnum": ("workspaces.models.WorkspaceMembership.Role"),
+        "AssignableWorkspaceRoleEnum": [
+            "ADMIN",
+            "MEMBER",
+            "GUEST",
+        ],
+        "ChannelTypeEnum": ("chat.models.Channel.Type"),
+        "NotificationTypeEnum": ("notifications.models.Notification.Type"),
+    },
 }
 
 CORS_ALLOWED_ORIGINS = env_list(
@@ -343,11 +363,28 @@ SIMPLE_JWT = {
 
 ASGI_APPLICATION = "config.asgi.application"
 
+REDIS_HOST = os.environ.get(
+    "REDIS_HOST",
+    "redis",
+)
+
+REDIS_PORT = int(
+    os.environ.get(
+        "REDIS_PORT",
+        "6379",
+    )
+)
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("redis", 6379)],
+            "hosts": [
+                (
+                    REDIS_HOST,
+                    REDIS_PORT,
+                )
+            ],
         },
     },
 }

@@ -1,4 +1,5 @@
 from django.contrib.auth import logout as django_logout
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -9,6 +10,7 @@ from .models import User
 from .serializers import (
     LogoutSerializer,
     RegisterSerializer,
+    SocialJWTExchangeResponseSerializer,
     UserSerializer,
 )
 
@@ -47,6 +49,12 @@ class SocialJWTExchangeView(generics.GenericAPIView):
         IsAuthenticated,
     ]
 
+    @extend_schema(
+        request=None,
+        responses={
+            200: SocialJWTExchangeResponseSerializer,
+        },
+    )
     def post(self, request):
         refresh = RefreshToken.for_user(
             request.user,

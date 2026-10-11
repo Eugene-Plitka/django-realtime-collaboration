@@ -1,5 +1,6 @@
 from accounts.models import User
 from django.db.models import Q
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -212,6 +213,12 @@ class ChannelDetailView(generics.RetrieveUpdateDestroyAPIView):
 class ChannelJoinView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={
+            201: ChannelMembershipSerializer,
+        },
+    )
     def post(self, request, channel_id):
         try:
             channel = Channel.objects.select_related("workspace").get(pk=channel_id)
@@ -254,6 +261,12 @@ class ChannelJoinView(generics.GenericAPIView):
 class ChannelLeaveView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={
+            204: None,
+        },
+    )
     def post(self, request, channel_id):
         try:
             channel = Channel.objects.select_related("workspace").get(pk=channel_id)
@@ -293,6 +306,13 @@ class ChannelMemberListCreateView(generics.GenericAPIView):
         except Channel.DoesNotExist:
             raise NotFound()
 
+    @extend_schema(
+        responses={
+            200: ChannelMembershipSerializer(
+                many=True,
+            ),
+        },
+    )
     def get(self, request, channel_id):
         channel = self.get_channel()
 
@@ -326,6 +346,12 @@ class ChannelMemberListCreateView(generics.GenericAPIView):
 
         return Response(serializer.data)
 
+    @extend_schema(
+        request=ChannelMemberAddSerializer,
+        responses={
+            201: ChannelMembershipSerializer,
+        },
+    )
     def post(self, request, channel_id):
         channel = self.get_channel()
 
@@ -372,6 +398,12 @@ class ChannelMemberListCreateView(generics.GenericAPIView):
 class ChannelMemberRemoveView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={
+            204: None,
+        },
+    )
     def delete(
         self,
         request,
