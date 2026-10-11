@@ -18,6 +18,16 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def env_list(name, default=""):
+    value = os.environ.get(
+        name,
+        default,
+    )
+
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 TESTING = "test" in sys.argv
 
 LOG_LEVEL = os.environ.get(
@@ -34,7 +44,10 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env_list(
+    "DJANGO_ALLOWED_HOSTS",
+    "localhost,127.0.0.1",
+)
 
 
 # Application definition
@@ -67,15 +80,69 @@ REST_FRAMEWORK = {
     ),
 }
 
-CORS_ALLOWED_ORIGINS = [
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
     "http://localhost:5173",
-]
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS",
     "http://localhost:5173",
-]
+)
+
+SECURE_SSL_REDIRECT = (
+    os.environ.get(
+        "DJANGO_SECURE_SSL_REDIRECT",
+        "False",
+    ).lower()
+    == "true"
+)
+
+SESSION_COOKIE_SECURE = (
+    os.environ.get(
+        "DJANGO_SESSION_COOKIE_SECURE",
+        "False",
+    ).lower()
+    == "true"
+)
+
+CSRF_COOKIE_SECURE = (
+    os.environ.get(
+        "DJANGO_CSRF_COOKIE_SECURE",
+        "False",
+    ).lower()
+    == "true"
+)
+
+SECURE_HSTS_SECONDS = int(
+    os.environ.get(
+        "DJANGO_SECURE_HSTS_SECONDS",
+        "0",
+    )
+)
+
+SECURE_HSTS_INCLUDE_SUBDOMAINS = (
+    os.environ.get(
+        "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS",
+        "False",
+    ).lower()
+    == "true"
+)
+
+SECURE_HSTS_PRELOAD = (
+    os.environ.get(
+        "DJANGO_SECURE_HSTS_PRELOAD",
+        "False",
+    ).lower()
+    == "true"
+)
+
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -245,6 +312,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 
 # Email

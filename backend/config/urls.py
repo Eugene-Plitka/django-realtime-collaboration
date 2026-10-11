@@ -15,13 +15,35 @@ Class-based views
 from django.contrib import admin
 from django.urls import include, path
 
+from .health import healthcheck
+
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("accounts/", include("allauth.urls")),
-    path("api/auth/", include("accounts.urls")),
-    path("api/workspaces/", include("workspaces.urls")),
-    path("api/", include("chat.urls")),
+    path(
+        "health/",
+        healthcheck,
+        name="healthcheck",
+    ),
+    path(
+        "admin/",
+        admin.site.urls,
+    ),
+    path(
+        "accounts/",
+        include("allauth.urls"),
+    ),
+    path(
+        "api/auth/",
+        include("accounts.urls"),
+    ),
+    path(
+        "api/workspaces/",
+        include("workspaces.urls"),
+    ),
+    path(
+        "api/",
+        include("chat.urls"),
+    ),
     path(
         "api/",
         include("notifications.urls"),
