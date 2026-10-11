@@ -6,10 +6,11 @@ import {
 
 function getWebSocketBaseUrl() {
   const apiBaseUrl =
-    import.meta.env.VITE_API_BASE_URL ??
-    "http://localhost:8000";
+    import.meta.env.VITE_API_BASE_URL;
 
-  const url = new URL(apiBaseUrl);
+  const url = apiBaseUrl
+    ? new URL(apiBaseUrl)
+    : new URL(window.location.origin);
 
   url.protocol =
     url.protocol === "https:"

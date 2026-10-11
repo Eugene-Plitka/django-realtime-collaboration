@@ -28,6 +28,11 @@ function AccountConnectionsModal({
     useState("");
 
   const [
+    successMessage,
+    setSuccessMessage,
+  ] = useState("");
+
+  const [
     busyProvider,
     setBusyProvider,
   ] = useState(null);
@@ -36,6 +41,36 @@ function AccountConnectionsModal({
     confirmingProvider,
     setConfirmingProvider,
   ] = useState(null);
+
+  const [
+    passwordFormOpen,
+    setPasswordFormOpen,
+  ] = useState(false);
+
+  const [
+    password,
+    setPassword,
+  ] = useState("");
+
+  const [
+    passwordConfirm,
+    setPasswordConfirm,
+  ] = useState("");
+
+  const [
+    passwordSubmitting,
+    setPasswordSubmitting,
+  ] = useState(false);
+
+  const [
+    showPassword,
+    setShowPassword,
+  ] = useState(false);
+
+  const [
+    showPasswordConfirm,
+    setShowPasswordConfirm,
+  ] = useState(false);
 
 
   const loadConnections = useCallback(
@@ -62,6 +97,12 @@ function AccountConnectionsModal({
           await response.json();
 
         setConnectionData(data);
+
+        if (
+          data.password_login_available
+        ) {
+          setPasswordFormOpen(false);
+        }
       } catch (requestError) {
         setError(
           requestError.message,
@@ -80,6 +121,14 @@ function AccountConnectionsModal({
     }
 
     setConfirmingProvider(null);
+    setSuccessMessage("");
+    setError("");
+
+    setPassword("");
+    setPasswordConfirm("");
+
+    setShowPassword(false);
+    setShowPasswordConfirm(false);
 
     loadConnections();
   }, [
@@ -126,6 +175,7 @@ function AccountConnectionsModal({
   ) {
     setBusyProvider(provider);
     setError("");
+    setSuccessMessage("");
 
     try {
       const response =
@@ -165,6 +215,7 @@ function AccountConnectionsModal({
   ) {
     setBusyProvider(provider);
     setError("");
+    setSuccessMessage("");
 
     try {
       const response =
@@ -186,6 +237,10 @@ function AccountConnectionsModal({
 
       setConfirmingProvider(null);
 
+      setSuccessMessage(
+        "Sign-in provider disconnected.",
+      );
+
       await loadConnections();
     } catch (requestError) {
       setError(
@@ -194,6 +249,86 @@ function AccountConnectionsModal({
     } finally {
       setBusyProvider(null);
     }
+  }
+
+
+  async function handleSetPassword(
+    event,
+  ) {
+    event.preventDefault();
+
+    setError("");
+    setSuccessMessage("");
+
+    if (
+      password !==
+      passwordConfirm
+    ) {
+      setError(
+        "Passwords do not match.",
+      );
+
+      return;
+    }
+
+    setPasswordSubmitting(true);
+
+    try {
+      const response =
+        await apiRequest(
+          "/api/auth/password/set/",
+          {
+            method: "POST",
+            body: {
+              password,
+              password_confirm:
+                passwordConfirm,
+            },
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(
+            response,
+            "Unable to set password.",
+          ),
+        );
+      }
+
+      setPassword("");
+      setPasswordConfirm("");
+
+      setShowPassword(false);
+      setShowPasswordConfirm(false);
+
+      setPasswordFormOpen(false);
+
+      setSuccessMessage(
+        "Password sign-in is now enabled.",
+      );
+
+      await loadConnections();
+    } catch (requestError) {
+      setError(
+        requestError.message,
+      );
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  }
+
+
+  function handleCancelPasswordSetup() {
+    setPasswordFormOpen(false);
+
+    setPassword("");
+    setPasswordConfirm("");
+
+    setShowPassword(false);
+    setShowPasswordConfirm(false);
+
+    setError("");
   }
 
 
@@ -227,9 +362,10 @@ function AccountConnectionsModal({
             </h2>
 
             <p>
-              Connect Google or GitHub
-              to use them when signing
-              in to CollabSpace.
+              Manage password login,
+              Google and GitHub access
+              for your CollabSpace
+              account.
             </p>
           </div>
 
@@ -245,6 +381,12 @@ function AccountConnectionsModal({
         {error && (
           <div className="account-connections-error">
             {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="account-connections-success">
+            {successMessage}
           </div>
         )}
 
@@ -271,23 +413,250 @@ function AccountConnectionsModal({
                 </strong>
               </div>
 
-              <span
-                className={[
-                  "connection-status",
-                  connectionData
+              <div className="password-method-actions">
+                <span
+                  className={[
+                    "connection-status",
+                    connectionData
+                      .password_login_available
+                      ? "connected"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {connectionData
                     .password_login_available
-                    ? "connected"
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                {connectionData
-                  .password_login_available
-                  ? "Enabled"
-                  : "Unavailable"}
-              </span>
+                    ? "Enabled"
+                    : "Unavailable"}
+                </span>
+
+                {!connectionData
+                  .password_login_available && (
+                    <button
+                      className="connection-action connect password-connect-action"
+                      type="button"
+                      onClick={() => {
+                        if (
+                          passwordFormOpen
+                        ) {
+                          handleCancelPasswordSetup();
+                          return;
+                        }
+
+                        setPasswordFormOpen(
+                          true,
+                        );
+
+                        setError("");
+                        setSuccessMessage("");
+                      }}
+                    >
+                      {passwordFormOpen
+                        ? "Cancel"
+                        : "Set password"}
+                    </button>
+                  )}
+              </div>
             </div>
+
+            {!connectionData
+              .password_login_available &&
+              passwordFormOpen && (
+                <form
+                  className="password-setup-form"
+                  onSubmit={
+                    handleSetPassword
+                  }
+                >
+                  <div className="password-setup-heading">
+                    <strong>
+                      Add password sign-in
+                    </strong>
+
+                    <span>
+                      After this you can
+                      sign in using your
+                      email and password,
+                      even without Google
+                      or GitHub.
+                    </span>
+                  </div>
+
+                  <label>
+                    <span>
+                      New password
+                    </span>
+
+                    <div className="password-input-shell">
+                      <input
+                        type={
+                          showPassword
+                            ? "text"
+                            : "password"
+                        }
+                        value={password}
+                        onChange={(event) =>
+                          setPassword(
+                            event.target.value,
+                          )
+                        }
+                        autoComplete="new-password"
+                        placeholder="Create a strong password"
+                        required
+                      />
+
+                      <button
+                        className="password-visibility-button"
+                        type="button"
+                        aria-label={
+                          showPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                        title={
+                          showPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                        onClick={() =>
+                          setShowPassword(
+                            (current) =>
+                              !current,
+                          )
+                        }
+                      >
+                        {showPassword ? (
+                          <svg
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M3 3l18 18M10.6 10.6A2 2 0 0012 14a2 2 0 001.4-.6M9.9 4.2A10.8 10.8 0 0112 4c5.5 0 9 5 9 5a15.6 15.6 0 01-2.1 2.5M6.6 6.6C4.4 8.1 3 10 3 10s3.5 5 9 5a10.7 10.7 0 004.1-.8"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M3 12s3.5-5 9-5 9 5 9 5-3.5 5-9 5-9-5-9-5z"
+                            />
+
+                            <circle
+                              cx="12"
+                              cy="12"
+                              r="2.5"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </label>
+
+                  <label>
+                    <span>
+                      Confirm password
+                    </span>
+
+                    <div className="password-input-shell">
+                      <input
+                        type={
+                          showPasswordConfirm
+                            ? "text"
+                            : "password"
+                        }
+                        value={
+                          passwordConfirm
+                        }
+                        onChange={(event) =>
+                          setPasswordConfirm(
+                            event.target.value,
+                          )
+                        }
+                        autoComplete="new-password"
+                        placeholder="Repeat your password"
+                        required
+                      />
+
+                      <button
+                        className="password-visibility-button"
+                        type="button"
+                        aria-label={
+                          showPasswordConfirm
+                            ? "Hide password confirmation"
+                            : "Show password confirmation"
+                        }
+                        title={
+                          showPasswordConfirm
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                        onClick={() =>
+                          setShowPasswordConfirm(
+                            (current) =>
+                              !current,
+                          )
+                        }
+                      >
+                        {showPasswordConfirm ? (
+                          <svg
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M3 3l18 18M10.6 10.6A2 2 0 0012 14a2 2 0 001.4-.6M9.9 4.2A10.8 10.8 0 0112 4c5.5 0 9 5 9 5a15.6 15.6 0 01-2.1 2.5M6.6 6.6C4.4 8.1 3 10 3 10s3.5 5 9 5a10.7 10.7 0 004.1-.8"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M3 12s3.5-5 9-5 9 5 9 5-3.5 5-9 5-9-5-9-5z"
+                            />
+
+                            <circle
+                              cx="12"
+                              cy="12"
+                              r="2.5"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </label>
+
+                  <div className="password-setup-actions">
+                    <button
+                      className="secondary"
+                      type="button"
+                      disabled={
+                        passwordSubmitting
+                      }
+                      onClick={
+                        handleCancelPasswordSetup
+                      }
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      className="primary"
+                      type="submit"
+                      disabled={
+                        passwordSubmitting
+                      }
+                    >
+                      {passwordSubmitting
+                        ? "Saving..."
+                        : "Set password"}
+                    </button>
+                  </div>
+                </form>
+              )}
 
             <div className="account-provider-list">
               {connectionData.providers.map(
@@ -412,10 +781,11 @@ function AccountConnectionsModal({
             </div>
 
             <div className="account-connections-note">
-              CollabSpace will never let you
-              disconnect your final available
-              sign-in method. Connect another
-              provider or configure a password
+              CollabSpace will never let
+              you disconnect your final
+              available sign-in method.
+              Connect another provider
+              or configure a password
               first.
             </div>
           </>

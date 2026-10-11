@@ -5789,7 +5789,7 @@ button:disabled {
 }
 
 
-.account-login-summary div {
+.account-login-summary > div:first-child {
   display: grid;
   gap: 3px;
 }
@@ -6049,4 +6049,295 @@ button:disabled {
     grid-column: 2;
     justify-self: start;
   }
+}
+
+/* Password sign-in setup */
+
+.account-connections-success {
+  margin: 15px 20px 0;
+  padding: 10px 12px;
+
+  border:
+    1px solid
+    rgba(74, 222, 128, 0.22);
+  border-radius: 8px;
+
+  background:
+    rgba(34, 197, 94, 0.09);
+
+  color: #75dda0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+
+.account-login-summary
+.password-method-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+
+.password-setup-trigger {
+  height: 30px;
+  padding: 0 10px;
+
+  border:
+    1px solid #485a83;
+  border-radius: 7px;
+
+  background:
+    rgba(79, 96, 224, 0.12);
+
+  color: #aab4ff;
+
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 700;
+
+  transition:
+    transform 130ms ease,
+    border-color 130ms ease,
+    background 130ms ease;
+}
+
+
+.password-setup-trigger:hover {
+  transform: translateY(-1px);
+
+  border-color: #697cff;
+
+  background:
+    rgba(79, 96, 224, 0.2);
+}
+
+
+.password-setup-form {
+  display: grid;
+  gap: 14px;
+
+  margin: 12px 20px 0;
+  padding: 16px;
+
+  border:
+    1px solid #2d3a53;
+  border-radius: 11px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #131d2d,
+      #101827
+    );
+}
+
+
+.password-setup-heading {
+  display: grid;
+  gap: 5px;
+
+  margin-bottom: 2px;
+}
+
+
+.password-setup-heading strong {
+  color: #dfe4ed;
+  font-size: 11px;
+}
+
+
+.password-setup-heading span {
+  max-width: 480px;
+
+  color: #718097;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+
+.password-setup-form label {
+  display: grid;
+  gap: 7px;
+}
+
+
+.password-setup-form label > span {
+  color: #a6b0c0;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+
+.password-setup-form input {
+  width: 100%;
+  height: 39px;
+
+  padding: 0 11px;
+
+  border:
+    1px solid #2c3a52;
+  border-radius: 8px;
+  outline: none;
+
+  background: #0d1624;
+  color: #e9edf4;
+
+  font: inherit;
+  font-size: 10px;
+
+  transition:
+    border-color 130ms ease,
+    box-shadow 130ms ease;
+}
+
+
+.password-setup-form input::placeholder {
+  color: #526078;
+}
+
+
+.password-setup-form input:focus {
+  border-color: #6172ff;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(97, 114, 255, 0.1);
+}
+
+
+.password-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+
+  margin-top: 2px;
+}
+
+
+.password-setup-actions button {
+  height: 32px;
+  padding: 0 12px;
+
+  border-radius: 7px;
+
+  cursor: pointer;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+
+.password-setup-actions .secondary {
+  border:
+    1px solid #354259;
+
+  background: transparent;
+  color: #8996a9;
+}
+
+
+.password-setup-actions .primary {
+  border: 0;
+
+  background:
+    linear-gradient(
+      135deg,
+      #596cf5,
+      #4558df
+    );
+
+  color: #fff;
+}
+
+
+.password-setup-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Password method alignment */
+
+.password-method-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+
+.password-connect-action {
+  min-width: 82px;
+}
+
+
+.password-input-shell {
+  position: relative;
+  width: 100%;
+}
+
+
+.password-input-shell input {
+  padding-right: 44px;
+}
+
+
+.password-visibility-button {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 7px;
+
+  background: transparent;
+  color: #718097;
+
+  cursor: pointer;
+
+  transform:
+    translateY(-50%);
+
+  transition:
+    background 130ms ease,
+    color 130ms ease;
+}
+
+
+.password-visibility-button:hover {
+  background: #182337;
+  color: #c6cedc;
+}
+
+
+.password-visibility-button:focus-visible {
+  outline: none;
+
+  background: #182337;
+
+  box-shadow:
+    0 0 0 2px
+    rgba(97, 114, 255, 0.18);
+
+  color: #c6cedc;
+}
+
+
+.password-visibility-button svg {
+  width: 17px;
+  height: 17px;
+
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }

@@ -86,3 +86,41 @@ class SocialConnectResponseSerializer(serializers.Serializer):
     redirect_url = serializers.CharField(
         read_only=True,
     )
+
+
+class SetPasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+    )
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError(
+                {"password_confirm": ("Passwords do not match.")}
+            )
+
+        user = self.context["request"].user
+
+        validate_password(
+            attrs["password"],
+            user=user,
+        )
+
+        return attrs
+
+    def save(self, **kwargs):
+        user = self.context["request"].user
+
+        user.set_password(self.validated_data["password"])
+
+        user.save(
+            update_fields=[
+                "password",
+            ]
+        )
+
+        return user

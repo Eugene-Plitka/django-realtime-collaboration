@@ -423,3 +423,158 @@ class SocialConnectionManagementTests(APITestCase):
             response.status_code,
             status.HTTP_404_NOT_FOUND,
         )
+
+
+class SetPasswordTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="social-only@example.com",
+            username="social-only",
+        )
+
+        self.user.set_unusable_password()
+
+        self.user.save(
+            update_fields=[
+                "password",
+            ]
+        )
+
+        self.client.force_authenticate(
+            user=self.user,
+        )
+
+    def test_social_only_user_can_set_password(
+        self,
+    ):
+        response = self.client.post(
+            reverse("set-password"),
+            {
+                "password": "StrongPassword456!",
+                "password_confirm": "StrongPassword456!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertTrue(self.user.has_usable_password())
+
+        self.assertTrue(self.user.check_password("StrongPassword456!"))
+
+    def test_set_password_rejects_mismatched_passwords(
+        self,
+    ):
+        response = self.client.post(
+            reverse("set-password"),
+            {
+                "password": "StrongPassword456!",
+                "password_confirm": "DifferentPassword456!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertFalse(self.user.has_usable_password())
+
+    def test_set_password_rejects_weak_password(
+        self,
+    ):
+        response = self.client.post(
+            reverse("set-password"),
+            {
+                "password": "123",
+                "password_confirm": "123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_existing_password_cannot_be_replaced_by_set_endpoint(
+        self,
+    ):
+        self.user.set_password("ExistingPassword123!")
+
+        self.user.save(
+            update_fields=[
+                "password",
+            ]
+        )
+
+        response = self.client.post(
+            reverse("set-password"),
+            {
+                "password": "ReplacementPassword456!",
+                "password_confirm": "ReplacementPassword456!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertTrue(self.user.check_password("ExistingPassword123!"))
+
+    def test_password_login_works_after_setting_password(
+        self,
+    ):
+        response = self.client.post(
+            reverse("set-password"),
+            {
+                "password": "StrongPassword456!",
+                "password_confirm": "StrongPassword456!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        self.client.force_authenticate(
+            user=None,
+        )
+
+        login_response = self.client.post(
+            reverse("login"),
+            {
+                "email": "social-only@example.com",
+                "password": "StrongPassword456!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            login_response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertIn(
+            "access",
+            login_response.data,
+        )
+
+        self.assertIn(
+            "refresh",
+            login_response.data,
+        )

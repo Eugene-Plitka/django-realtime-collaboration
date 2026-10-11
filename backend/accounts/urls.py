@@ -8,6 +8,7 @@ from .views import (
     LogoutView,
     MeView,
     RegisterView,
+    SetPasswordView,
     SocialConnectionListView,
     SocialConnectStartView,
     SocialDisconnectView,
@@ -45,6 +46,11 @@ urlpatterns = [
         "me/",
         MeView.as_view(),
         name="me",
+    ),
+    path(
+        "password/set/",
+        SetPasswordView.as_view(),
+        name="set-password",
     ),
     path(
         "social/exchange/",

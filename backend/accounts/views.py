@@ -18,6 +18,7 @@ from .models import User
 from .serializers import (
     LogoutSerializer,
     RegisterSerializer,
+    SetPasswordSerializer,
     SocialConnectionListSerializer,
     SocialConnectResponseSerializer,
     SocialJWTExchangeResponseSerializer,
@@ -255,6 +256,39 @@ class SocialDisconnectView(generics.GenericAPIView):
             )
 
         social_account.delete()
+
+        return Response(
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+class SetPasswordView(generics.GenericAPIView):
+    serializer_class = SetPasswordSerializer
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    @extend_schema(
+        responses={
+            204: None,
+        },
+    )
+    def post(self, request):
+        if request.user.has_usable_password():
+            return Response(
+                {"detail": ("Password sign-in is already configured.")},
+                status=(status.HTTP_400_BAD_REQUEST),
+            )
+
+        serializer = self.get_serializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        serializer.save()
 
         return Response(
             status=status.HTTP_204_NO_CONTENT,
