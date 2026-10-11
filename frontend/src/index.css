@@ -537,7 +537,7 @@ input {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 9px;
 
   height: 46px;
 
@@ -547,29 +547,73 @@ input {
 
   background: #101827;
   color: #b9c3d6;
+
+  cursor: pointer;
+
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
 
-.social-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
+.social-button:hover {
+  transform: translateY(-2px);
+
+  border-color: #5668df;
+
+  background:
+    linear-gradient(
+      145deg,
+      #16213a,
+      #121b2d
+    );
+
+  color: #f0f3ff;
+
+  box-shadow:
+    0 10px 26px
+    rgba(65, 84, 245, 0.16);
 }
 
-.social-icon {
-  display: grid;
-  place-items: center;
+.social-button:active {
+  transform: translateY(0);
+
+  box-shadow:
+    0 5px 14px
+    rgba(65, 84, 245, 0.1);
+}
+
+.social-button:focus-visible {
+  outline: none;
+
+  border-color: #6f7cff;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(97, 114, 255, 0.16);
+}
+
+.social-provider-logo {
+  flex: 0 0 auto;
+  display: block;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #223058;
-  font-size: 10px;
-  font-weight: 800;
 }
 
-.social-icon.github {
-  background: #d9deea;
-  font-size: 8px;
+.social-provider-logo.github {
+  width: 23px;
+  height: 23px;
+  color: #e7ebf3;
 }
+
+.social-button > span {
+  line-height: 1;
+}
+
+
+
 
 .social-button small {
   padding: 3px 5px;

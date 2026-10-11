@@ -181,7 +181,9 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            BASE_DIR / "templates",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -226,15 +228,19 @@ ACCOUNT_SIGNUP_FIELDS = [
     "password2*",
 ]
 
-SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_AUTO_SIGNUP = False
 SOCIALACCOUNT_EMAIL_REQUIRED = True
 SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_STORE_TOKENS = False
 
-SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = False
 
 SOCIALACCOUNT_LOGIN_ON_GET = False
+
+SOCIALACCOUNT_FORMS = {
+    "signup": "accounts.forms.SocialSignupForm",
+}
 
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get(
     "GOOGLE_OAUTH_CLIENT_ID",

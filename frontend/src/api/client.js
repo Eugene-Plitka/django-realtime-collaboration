@@ -6,6 +6,29 @@ const API_BASE_URL =
 const ACCESS_TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 
+export function getApiBaseUrl() {
+  return API_BASE_URL;
+}
+
+
+export function getCookie(name) {
+  const prefix = `${name}=`;
+
+  const cookie = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) =>
+      item.startsWith(prefix),
+    );
+
+  if (!cookie) {
+    return null;
+  }
+
+  return decodeURIComponent(
+    cookie.slice(prefix.length),
+  );
+}
 
 export function getAccessToken() {
   return localStorage.getItem(
@@ -95,6 +118,7 @@ export async function apiRequest(
     body = null,
     headers = {},
     skipAuth = false,
+    credentials = "same-origin",
   } = {},
   allowRefresh = true,
 ) {
@@ -135,6 +159,7 @@ export async function apiRequest(
       method,
       headers: requestHeaders,
       body: requestBody,
+      credentials,
     },
   );
 
@@ -155,6 +180,7 @@ export async function apiRequest(
           body,
           headers,
           skipAuth,
+          credentials,
         },
         false,
       );

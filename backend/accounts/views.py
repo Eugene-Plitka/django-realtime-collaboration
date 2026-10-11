@@ -1,7 +1,9 @@
 from django.contrib.auth import logout as django_logout
+from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -13,6 +15,21 @@ from .serializers import (
     SocialJWTExchangeResponseSerializer,
     UserSerializer,
 )
+
+
+@extend_schema(
+    request=None,
+    responses={
+        204: None,
+    },
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+@ensure_csrf_cookie
+def csrf_cookie_view(request):
+    return Response(
+        status=status.HTTP_204_NO_CONTENT,
+    )
 
 
 class RegisterView(generics.CreateAPIView):

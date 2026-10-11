@@ -9,10 +9,16 @@ from .views import (
     MeView,
     RegisterView,
     SocialJWTExchangeView,
+    csrf_cookie_view,
 )
 
 
 urlpatterns = [
+    path(
+        "csrf/",
+        csrf_cookie_view,
+        name="csrf-cookie",
+    ),
     path(
         "register/",
         RegisterView.as_view(),
