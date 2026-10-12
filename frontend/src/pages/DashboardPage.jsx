@@ -1223,6 +1223,9 @@ function DashboardPage() {
               onEditProfile={
                 openProfileSettings
               }
+              onUserChanged={
+                loadUser
+              }
             />
           </div>
         </section>

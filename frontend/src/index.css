@@ -8554,8 +8554,23 @@ p {
 
 
 .dashboard-user-status.online,
-.user-menu-status-dot.online {
+.user-menu-status-dot.online,
+.user-status-option-dot.online {
   background: #4ade80;
+}
+
+
+.dashboard-user-status.away,
+.user-menu-status-dot.away,
+.user-status-option-dot.away {
+  background: #fbbf24;
+}
+
+
+.dashboard-user-status.dnd,
+.user-menu-status-dot.dnd,
+.user-status-option-dot.dnd {
+  background: #ef4444;
 }
 
 
@@ -8878,12 +8893,12 @@ p {
   border-radius: 50%;
 
   box-shadow:
-    0 0 9px
+    0 0 8px
     rgba(
-      74,
-      222,
-      128,
-      0.28
+      255,
+      255,
+      255,
+      0.12
     );
 }
 
@@ -8898,8 +8913,176 @@ p {
       14px *
       var(--font-scale)
     );
+
+  transition:
+    transform 150ms ease;
 }
 
+
+.user-menu-next.open {
+  transform:
+    rotate(90deg);
+}
+
+.user-menu-action.active {
+  background: #172235;
+  color: #edf1f7;
+}
+
+
+.user-status-options {
+  display: grid;
+
+  max-height: 0;
+
+  overflow: hidden;
+
+  margin:
+    0 4px;
+
+  opacity: 0;
+
+  transform:
+    translateY(-5px);
+
+  transition:
+    max-height 180ms ease,
+    opacity 150ms ease,
+    transform 180ms ease,
+    margin 180ms ease;
+}
+
+
+.user-status-options.open {
+  max-height: 150px;
+
+  margin:
+    4px 4px 7px;
+
+  opacity: 1;
+
+  transform:
+    translateY(0);
+}
+
+
+.user-status-option {
+  display: flex;
+  align-items: center;
+
+  width: 100%;
+  min-height: 35px;
+
+  gap: 9px;
+
+  padding:
+    5px 8px;
+
+  border: 0;
+  border-radius: 7px;
+
+  background: transparent;
+  color: #8795aa;
+
+  cursor: pointer;
+
+  font: inherit;
+  text-align: left;
+
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+
+.user-status-option:hover {
+  background: #151f30;
+  color: #dce2ec;
+}
+
+
+.user-status-option.selected {
+  color: #e6eaf1;
+}
+
+
+.user-status-option:disabled {
+  cursor: wait;
+
+  opacity: 0.55;
+}
+
+
+.user-status-option-dot {
+  flex: 0 0 auto;
+
+  width: 9px;
+  height: 9px;
+
+  border-radius: 50%;
+}
+
+
+.user-status-option > span:nth-child(2) {
+  flex: 1;
+
+  font-size:
+    calc(
+      9px *
+      var(--font-scale)
+    );
+}
+
+
+.user-status-option > strong {
+  flex: 0 0 auto;
+
+  color: #8592ff;
+
+  font-size:
+    calc(
+      9px *
+      var(--font-scale)
+    );
+}
+
+
+.user-status-error {
+  margin:
+    5px 8px 7px;
+
+  padding:
+    7px 8px;
+
+  border:
+    1px solid
+    rgba(
+      248,
+      113,
+      113,
+      0.22
+    );
+
+  border-radius: 6px;
+
+  background:
+    rgba(
+      127,
+      29,
+      29,
+      0.12
+    );
+
+  color: #e99aa5;
+
+  font-size:
+    calc(
+      7px *
+      var(--font-scale)
+    );
+
+  line-height: 1.45;
+}
 
 .user-menu-action.danger {
   color: #d38b99;
