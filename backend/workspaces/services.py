@@ -56,6 +56,46 @@ def remove_workspace_member(*, membership):
 
 
 @transaction.atomic
+def change_workspace_member_role(
+    *,
+    membership,
+    new_role,
+):
+    previous_role = membership.role
+
+    membership.role = new_role
+    membership.save(
+        update_fields=["role"],
+    )
+
+    if (
+        previous_role != WorkspaceMembership.Role.GUEST
+        and new_role == WorkspaceMembership.Role.GUEST
+    ):
+        ChannelMembership.objects.filter(
+            channel__workspace=membership.workspace,
+            channel__type=Channel.Type.PUBLIC,
+            user=membership.user,
+        ).delete()
+
+    if (
+        previous_role == WorkspaceMembership.Role.GUEST
+        and new_role != WorkspaceMembership.Role.GUEST
+    ):
+        general_channel = Channel.objects.get(
+            workspace=membership.workspace,
+            is_general=True,
+        )
+
+        ChannelMembership.objects.get_or_create(
+            channel=general_channel,
+            user=membership.user,
+        )
+
+    return membership
+
+
+@transaction.atomic
 def transfer_workspace_ownership(*, workspace, current_owner, new_owner_membership):
     current_owner_membership = WorkspaceMembership.objects.select_for_update().get(
         workspace=workspace,

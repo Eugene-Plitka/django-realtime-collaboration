@@ -1,3 +1,5 @@
+{% load static %}
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -85,17 +87,19 @@
       height: 38px;
       place-items: center;
 
+      overflow: hidden;
+
       border-radius: 11px;
 
       background:
-        linear-gradient(
-          145deg,
-          #6f7cff,
-          #4057f6
-        );
+        url("{% static 'accounts/collabspace-app-icon.png' %}")
+        center / 125%
+        no-repeat;
 
-      color: white;
-      font-weight: 800;
+      box-shadow: none;
+
+      color: transparent;
+      font-size: 0;
     }
 
     .eyebrow {

@@ -33,6 +33,7 @@ from .services import (
     accept_workspace_invitation,
     add_workspace_member,
     cancel_workspace_invitation,
+    change_workspace_member_role,
     create_workspace,
     create_workspace_invitation,
     leave_workspace,
@@ -101,7 +102,8 @@ class WorkspaceMemberRoleUpdateView(generics.UpdateAPIView):
     def get_object(self):
         try:
             target_membership = WorkspaceMembership.objects.select_related(
-                "workspace", "user"
+                "workspace",
+                "user",
             ).get(
                 pk=self.kwargs["membership_id"],
                 workspace_id=self.kwargs["workspace_id"],
@@ -117,7 +119,9 @@ class WorkspaceMemberRoleUpdateView(generics.UpdateAPIView):
         if actor_membership is None:
             raise NotFound()
 
-        new_role = self.request.data.get("role")
+        new_role = self.request.data.get(
+            "role",
+        )
 
         if not can_change_role(
             actor_membership=actor_membership,
@@ -127,6 +131,16 @@ class WorkspaceMemberRoleUpdateView(generics.UpdateAPIView):
             raise PermissionDenied("You cannot change this member's role.")
 
         return target_membership
+
+    def perform_update(self, serializer):
+        membership = serializer.instance
+
+        change_workspace_member_role(
+            membership=membership,
+            new_role=serializer.validated_data["role"],
+        )
+
+        serializer.instance = membership
 
 
 class WorkspaceMemberRemoveView(generics.DestroyAPIView):

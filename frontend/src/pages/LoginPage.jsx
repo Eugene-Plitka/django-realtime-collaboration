@@ -212,7 +212,7 @@ function LoginPage() {
                 event.target.value,
               )
             }
-            placeholder="you@example.com"
+            placeholder="email@example.com"
             autoComplete="email"
             required
           />

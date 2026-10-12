@@ -58,6 +58,21 @@ function WorkspaceMembersPanel({
     setInviteModalOpen,
   ] = useState(false);
 
+  const [
+    roleUpdatingId,
+    setRoleUpdatingId,
+  ] = useState(null);
+
+  const [
+    removeConfirmId,
+    setRemoveConfirmId,
+  ] = useState(null);
+
+  const [
+    removingId,
+    setRemovingId,
+  ] = useState(null);
+
 
   const canManageInvitations =
     workspaceRole === "OWNER" ||
@@ -142,6 +157,59 @@ function WorkspaceMembersPanel({
   }, [loadMembers]);
 
 
+  function canManageMember(
+    member,
+  ) {
+    if (
+      member.user_id === user.id ||
+      member.role === "OWNER"
+    ) {
+      return false;
+    }
+
+    if (
+      workspaceRole === "OWNER"
+    ) {
+      return true;
+    }
+
+    if (
+      workspaceRole === "ADMIN"
+    ) {
+      return (
+        member.role === "MEMBER" ||
+        member.role === "GUEST"
+      );
+    }
+
+    return false;
+  }
+
+
+  function manageableRoles() {
+    if (
+      workspaceRole === "OWNER"
+    ) {
+      return [
+        "ADMIN",
+        "MEMBER",
+        "GUEST",
+      ];
+    }
+
+    if (
+      workspaceRole === "ADMIN"
+    ) {
+      return [
+        "MEMBER",
+        "GUEST",
+      ];
+    }
+
+    return [];
+  }
+
+
   function handleInvited(
     invitation,
   ) {
@@ -151,6 +219,119 @@ function WorkspaceMembersPanel({
         ...currentInvitations,
       ],
     );
+  }
+
+
+  async function updateMemberRole(
+    member,
+    newRole,
+  ) {
+    if (
+      newRole === member.role ||
+      roleUpdatingId !== null
+    ) {
+      return;
+    }
+
+    setError("");
+    setRemoveConfirmId(null);
+    setRoleUpdatingId(member.id);
+
+    try {
+      const response =
+        await apiRequest(
+          `/api/workspaces/${workspace.id}/members/${member.id}/role/`,
+          {
+            method: "PATCH",
+            body: {
+              role: newRole,
+            },
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(
+            response,
+            "Unable to update member role.",
+          ),
+        );
+      }
+
+      const updatedMember =
+        await response.json();
+
+      setMembers(
+        (currentMembers) =>
+          currentMembers.map(
+            (currentMember) =>
+              currentMember.id ===
+              member.id
+                ? {
+                    ...currentMember,
+                    role:
+                      updatedMember.role,
+                  }
+                : currentMember,
+          ),
+      );
+    } catch (requestError) {
+      setError(
+        requestError.message,
+      );
+    } finally {
+      setRoleUpdatingId(null);
+    }
+  }
+
+
+  async function removeMember(
+    member,
+  ) {
+    if (
+      removingId !== null
+    ) {
+      return;
+    }
+
+    setError("");
+    setRemovingId(member.id);
+
+    try {
+      const response =
+        await apiRequest(
+          `/api/workspaces/${workspace.id}/members/${member.id}/`,
+          {
+            method: "DELETE",
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(
+            response,
+            "Unable to remove member.",
+          ),
+        );
+      }
+
+      setMembers(
+        (currentMembers) =>
+          currentMembers.filter(
+            (currentMember) =>
+              currentMember.id !==
+              member.id,
+          ),
+      );
+
+      setRemoveConfirmId(null);
+    } catch (requestError) {
+      setError(
+        requestError.message,
+      );
+    } finally {
+      setRemovingId(null);
+    }
   }
 
 
@@ -264,51 +445,187 @@ function WorkspaceMembersPanel({
 
               <div className="member-list">
                 {members.map(
-                  (member) => (
-                    <article
-                      className="member-row"
-                      key={member.id}
-                    >
-                      <div className="member-avatar">
-                        {memberInitial(
-                          member.username,
-                        )}
-                      </div>
+                  (member) => {
+                    const canManage =
+                      canManageMember(
+                        member,
+                      );
 
-                      <div className="member-identity">
-                        <strong>
-                          {member.username}
+                    const isUpdating =
+                      roleUpdatingId ===
+                      member.id;
 
-                          {member.user_id ===
-                            user.id && (
-                            <small>
-                              you
+                    const isRemoving =
+                      removingId ===
+                      member.id;
+
+                    const isConfirmingRemoval =
+                      removeConfirmId ===
+                      member.id;
+
+                    return (
+                      <article
+                        className="member-row"
+                        key={member.id}
+                      >
+                        <div className="member-avatar">
+                          {memberInitial(
+                            member.username,
+                          )}
+                        </div>
+
+                        <div className="member-identity">
+                          <strong>
+                            {member.username}
+
+                            {member.user_id ===
+                              user.id && (
+                              <small>
+                                you
+                              </small>
+                            )}
+                          </strong>
+
+                          <span>
+                            {member.email}
+                          </span>
+                        </div>
+
+                        <div className="member-role-control">
+                          {canManage ? (
+                            <select
+                              className={[
+                                "member-role-select",
+                                member.role.toLowerCase(),
+                              ].join(" ")}
+                              value={
+                                member.role
+                              }
+                              disabled={
+                                isUpdating ||
+                                isRemoving
+                              }
+                              aria-label={`Role for ${member.username}`}
+                              onChange={(
+                                event,
+                              ) =>
+                                updateMemberRole(
+                                  member,
+                                  event.target
+                                    .value,
+                                )
+                              }
+                            >
+                              {manageableRoles().map(
+                                (
+                                  role,
+                                ) => (
+                                  <option
+                                    key={
+                                      role
+                                    }
+                                    value={
+                                      role
+                                    }
+                                  >
+                                    {role}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          ) : (
+                            <span
+                              className={[
+                                "member-role",
+                                member.role.toLowerCase(),
+                              ].join(" ")}
+                            >
+                              {member.role}
+                            </span>
+                          )}
+
+                          {isUpdating && (
+                            <small className="member-action-status">
+                              Saving...
                             </small>
                           )}
-                        </strong>
+                        </div>
 
-                        <span>
-                          {member.email}
-                        </span>
-                      </div>
+                        <time>
+                          Joined{" "}
+                          {formatDate(
+                            member.joined_at,
+                          )}
+                        </time>
 
-                      <span
-                        className={[
-                          "member-role",
-                          member.role.toLowerCase(),
-                        ].join(" ")}
-                      >
-                        {member.role}
-                      </span>
+                        <div className="member-actions">
+                          {canManage &&
+                            !isConfirmingRemoval && (
+                              <button
+                                className="member-remove-button"
+                                type="button"
+                                disabled={
+                                  isUpdating ||
+                                  isRemoving
+                                }
+                                onClick={() =>
+                                  setRemoveConfirmId(
+                                    member.id,
+                                  )
+                                }
+                              >
+                                Remove
+                              </button>
+                            )}
 
-                      <time>
-                        Joined{" "}
-                        {formatDate(
-                          member.joined_at,
-                        )}
-                      </time>
-                    </article>
-                  ),
+                          {canManage &&
+                            isConfirmingRemoval && (
+                              <div className="member-remove-confirmation">
+                                <span>
+                                  Remove?
+                                </span>
+
+                                <button
+                                  className="confirm"
+                                  type="button"
+                                  title="Confirm removal"
+                                  aria-label={`Remove ${member.username}`}
+                                  disabled={
+                                    isRemoving
+                                  }
+                                  onClick={() =>
+                                    removeMember(
+                                      member,
+                                    )
+                                  }
+                                >
+                                  {isRemoving
+                                    ? "…"
+                                    : "✓"}
+                                </button>
+
+                                <button
+                                  className="cancel"
+                                  type="button"
+                                  title="Cancel"
+                                  aria-label="Cancel removal"
+                                  disabled={
+                                    isRemoving
+                                  }
+                                  onClick={() =>
+                                    setRemoveConfirmId(
+                                      null,
+                                    )
+                                  }
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      </article>
+                    );
+                  },
                 )}
               </div>
             </section>

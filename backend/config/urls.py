@@ -12,7 +12,9 @@ Class-based views
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from django.conf import settings
 from django.contrib import admin
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include, path
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -65,3 +67,6 @@ urlpatterns = [
         include("notifications.urls"),
     ),
 ]
+
+if settings.DEBUG:
+    urlpatterns += staticfiles_urlpatterns()

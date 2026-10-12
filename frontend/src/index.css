@@ -120,20 +120,26 @@ input {
 .workspace-logo {
   display: grid;
   place-items: center;
+
+  overflow: hidden;
+
   background:
-    linear-gradient(
-      145deg,
-      #6f7cff,
-      #4057f6
-    );
-  box-shadow:
-    0 8px 28px
-    rgba(65, 84, 255, 0.34);
+    url("/collabspace-app-icon.png")
+    center / cover
+    no-repeat;
+
+  box-shadow: none;
+
+  color: transparent;
+  font-size: 0;
 }
 
 .brand-mark {
   width: 38px;
   height: 38px;
+
+  flex: 0 0 auto;
+
   border-radius: 11px;
 }
 
@@ -679,6 +685,9 @@ input {
 
 .workspace-logo {
   margin-bottom: 10px;
+
+  background-size: 125%;
+
   font-weight: 800;
 }
 
@@ -3050,6 +3059,236 @@ div {
   color: #eaa1b3;
 }
 
+/* Workspace member management */
+
+.member-row {
+  grid-template-columns:
+    42px
+    minmax(150px, 1fr)
+    minmax(90px, auto)
+    auto
+    minmax(90px, auto);
+}
+
+
+.member-role-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+
+.member-role-select {
+  min-width: 96px;
+  height: 30px;
+  padding: 0 28px 0 9px;
+
+  border:
+    1px solid #303d55;
+  border-radius: 7px;
+  outline: none;
+
+  background: #151f30;
+  color: #909db2;
+
+  cursor: pointer;
+
+  font-size: 8px;
+  font-weight: 750;
+
+  transition:
+    border-color 130ms ease,
+    background 130ms ease,
+    box-shadow 130ms ease;
+}
+
+
+.member-role-select:hover:not(:disabled) {
+  border-color: #4a5a78;
+  background: #192538;
+}
+
+
+.member-role-select:focus {
+  border-color: #6172ff;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(97, 114, 255, 0.1);
+}
+
+
+.member-role-select.owner {
+  border-color:
+    rgba(251, 191, 36, 0.25);
+  color: #f4c95d;
+}
+
+
+.member-role-select.admin {
+  border-color:
+    rgba(99, 116, 255, 0.32);
+  color: #8996ff;
+}
+
+
+.member-role-select.guest {
+  color: #8591a5;
+}
+
+
+.member-role-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+
+.member-action-status {
+  color: #68768c;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+
+.member-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 90px;
+}
+
+
+.member-remove-button {
+  height: 30px;
+  padding: 0 10px;
+
+  border:
+    1px solid #493440;
+  border-radius: 7px;
+
+  background: transparent;
+  color: #bd8591;
+
+  cursor: pointer;
+
+  font-size: 8px;
+  font-weight: 700;
+
+  transition:
+    border-color 130ms ease,
+    background 130ms ease,
+    color 130ms ease;
+}
+
+
+.member-remove-button:hover:not(:disabled) {
+  border-color: #7a4957;
+
+  background:
+    rgba(127, 29, 29, 0.13);
+
+  color: #efa0ad;
+}
+
+
+.member-remove-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+.member-remove-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+
+.member-remove-confirmation > span {
+  margin-right: 2px;
+  color: #b77f8a;
+  font-size: 8px;
+}
+
+
+.member-remove-confirmation button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+
+  padding: 0;
+
+  border:
+    1px solid #39465a;
+  border-radius: 6px;
+
+  background: transparent;
+
+  cursor: pointer;
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+
+.member-remove-confirmation
+button.confirm {
+  color: #67d590;
+}
+
+
+.member-remove-confirmation
+button.confirm:hover:not(:disabled) {
+  border-color:
+    rgba(74, 222, 128, 0.38);
+
+  background:
+    rgba(34, 197, 94, 0.1);
+}
+
+
+.member-remove-confirmation
+button.cancel {
+  color: #d88996;
+}
+
+
+.member-remove-confirmation
+button.cancel:hover:not(:disabled) {
+  border-color:
+    rgba(248, 113, 113, 0.35);
+
+  background:
+    rgba(239, 68, 68, 0.1);
+}
+
+
+.member-remove-confirmation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+@media (max-width: 850px) {
+  .member-row {
+    grid-template-columns:
+      42px
+      minmax(120px, 1fr)
+      auto;
+  }
+
+  .member-role-control,
+  .member-row time,
+  .member-actions {
+    grid-column: 2 / -1;
+  }
+
+  .member-actions {
+    justify-content: flex-start;
+  }
+}
 
 /* Invite modal */
 
@@ -6340,4 +6579,25 @@ button:disabled {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
+}
+
+/* Auth brand sizing */
+
+.auth-showcase .brand-row {
+  gap: 14px;
+
+  font-size: 21px;
+  font-weight: 750;
+}
+
+
+.auth-showcase .brand-mark {
+  width: 52px;
+  height: 52px;
+
+  flex: 0 0 52px;
+
+  border-radius: 14px;
+
+  background-size: 125%;
 }

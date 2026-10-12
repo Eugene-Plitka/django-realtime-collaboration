@@ -1430,6 +1430,115 @@ class WorkspaceAPITests(APITestCase):
             ),
         )
 
+    def test_changing_member_to_guest_removes_public_channel_memberships(
+        self,
+    ):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        member = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        membership = WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        general_channel = Channel.objects.get(
+            workspace=workspace,
+            is_general=True,
+        )
+
+        ChannelMembership.objects.create(
+            channel=general_channel,
+            user=member,
+        )
+
+        response = self.client.patch(
+            reverse(
+                "workspace-member-role-update",
+                kwargs={
+                    "workspace_id": workspace.id,
+                    "membership_id": membership.id,
+                },
+            ),
+            {
+                "role": WorkspaceMembership.Role.GUEST,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertFalse(
+            ChannelMembership.objects.filter(
+                channel=general_channel,
+                user=member,
+            ).exists()
+        )
+
+    def test_changing_guest_to_member_adds_general_channel_membership(
+        self,
+    ):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        guest = User.objects.create_user(
+            email="guest@example.com",
+            username="guest",
+            password="StrongPassword123!",
+        )
+
+        membership = WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=guest,
+            role=WorkspaceMembership.Role.GUEST,
+        )
+
+        general_channel = Channel.objects.get(
+            workspace=workspace,
+            is_general=True,
+        )
+
+        response = self.client.patch(
+            reverse(
+                "workspace-member-role-update",
+                kwargs={
+                    "workspace_id": workspace.id,
+                    "membership_id": membership.id,
+                },
+            ),
+            {
+                "role": WorkspaceMembership.Role.MEMBER,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertTrue(
+            ChannelMembership.objects.filter(
+                channel=general_channel,
+                user=guest,
+            ).exists()
+        )
+
 
 class CreateWorkspaceInvitationServiceTests(TestCase):
     def setUp(self):

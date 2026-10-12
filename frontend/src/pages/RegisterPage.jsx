@@ -98,7 +98,7 @@ function RegisterPage() {
                 event.target.value,
               )
             }
-            placeholder="alex"
+            placeholder="username"
             autoComplete="username"
             required
           />
@@ -117,7 +117,7 @@ function RegisterPage() {
                 event.target.value,
               )
             }
-            placeholder="you@example.com"
+            placeholder="email@example.com"
             autoComplete="email"
             required
           />

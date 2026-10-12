@@ -171,7 +171,7 @@ function InviteMemberModal({
                   event.target.value,
                 )
               }
-              placeholder="nick@example.com"
+              placeholder="email@example.com"
               autoComplete="email"
               autoFocus
               required
