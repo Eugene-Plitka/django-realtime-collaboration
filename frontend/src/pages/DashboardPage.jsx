@@ -415,6 +415,19 @@ function DashboardPage() {
     );
   }
 
+  function openProfileSettings() {
+    setNotificationTargetChannelId(
+      null,
+    );
+
+    setSettingsSection(
+      "profile",
+    );
+
+    setMainView(
+      "settings",
+    );
+  }
 
   function handleWorkspaceCreated(
     workspace,
@@ -1207,6 +1220,9 @@ function DashboardPage() {
             <AccountConnectionsLauncher
               user={user}
               logout={logout}
+              onEditProfile={
+                openProfileSettings
+              }
             />
           </div>
         </section>

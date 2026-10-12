@@ -3,6 +3,20 @@ from django.db import models
 
 
 class User(AbstractUser):
+    class Status(models.TextChoices):
+        ONLINE = (
+            "ONLINE",
+            "Online",
+        )
+        AWAY = (
+            "AWAY",
+            "Away",
+        )
+        DND = (
+            "DND",
+            "Do Not Disturb",
+        )
+
     email = models.EmailField(
         unique=True,
     )
@@ -35,6 +49,12 @@ class User(AbstractUser):
             (5, "113%"),
             (6, "120%"),
         ],
+    )
+
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.ONLINE,
     )
 
     created_at = models.DateTimeField(

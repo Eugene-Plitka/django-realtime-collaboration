@@ -752,3 +752,128 @@ class InterfaceScaleTests(
             response.status_code,
             status.HTTP_400_BAD_REQUEST,
         )
+
+
+class UserStatusTests(
+    APITestCase,
+):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="status@example.com",
+            username="status-user",
+            password="StrongPassword123!",
+        )
+
+        self.client.force_authenticate(
+            user=self.user,
+        )
+
+    def test_default_status_is_online(
+        self,
+    ):
+        response = self.client.get(
+            reverse("me"),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["status"],
+            User.Status.ONLINE,
+        )
+
+    def test_user_can_set_away_status(
+        self,
+    ):
+        response = self.client.patch(
+            reverse("me"),
+            {
+                "status": User.Status.AWAY,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertEqual(
+            self.user.status,
+            User.Status.AWAY,
+        )
+
+    def test_user_can_set_dnd_status(
+        self,
+    ):
+        response = self.client.patch(
+            reverse("me"),
+            {
+                "status": User.Status.DND,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertEqual(
+            self.user.status,
+            User.Status.DND,
+        )
+
+    def test_user_can_restore_online_status(
+        self,
+    ):
+        self.user.status = User.Status.AWAY
+
+        self.user.save(
+            update_fields=[
+                "status",
+            ],
+        )
+
+        response = self.client.patch(
+            reverse("me"),
+            {
+                "status": User.Status.ONLINE,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertEqual(
+            self.user.status,
+            User.Status.ONLINE,
+        )
+
+    def test_invalid_status_is_rejected(
+        self,
+    ):
+        response = self.client.patch(
+            reverse("me"),
+            {
+                "status": "BUSY",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
