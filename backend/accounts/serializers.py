@@ -46,6 +46,7 @@ class UserSerializer(
             "username",
             "avatar_url",
             "avatar_source",
+            "interface_scale_level",
         )
 
         read_only_fields = (

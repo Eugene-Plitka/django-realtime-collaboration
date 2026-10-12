@@ -3,7 +3,9 @@ from django.db import models
 
 
 class User(AbstractUser):
-    email = models.EmailField(unique=True)
+    email = models.EmailField(
+        unique=True,
+    )
 
     avatar = models.ImageField(
         upload_to="avatars/",
@@ -20,6 +22,19 @@ class User(AbstractUser):
     social_avatar_provider = models.CharField(
         max_length=20,
         blank=True,
+    )
+
+    interface_scale_level = models.PositiveSmallIntegerField(
+        default=3,
+        choices=[
+            (0, "80%"),
+            (1, "87%"),
+            (2, "94%"),
+            (3, "100%"),
+            (4, "107%"),
+            (5, "113%"),
+            (6, "120%"),
+        ],
     )
 
     created_at = models.DateTimeField(

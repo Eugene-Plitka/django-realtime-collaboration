@@ -1,8 +1,16 @@
 import logging
 
 from channels.db import database_sync_to_async
-from channels.generic.websocket import AsyncJsonWebsocketConsumer
-from workspaces.models import WorkspaceMembership
+from channels.generic.websocket import (
+    AsyncJsonWebsocketConsumer,
+)
+from workspaces.models import (
+    WorkspaceMembership,
+)
+
+from accounts.avatar_utils import (
+    get_user_avatar_url,
+)
 
 from .models import (
     Channel,
@@ -23,7 +31,9 @@ from .services import (
 logger = logging.getLogger(__name__)
 
 
-def reply_to_data(message):
+def reply_to_data(
+    message,
+):
     if message.reply_to_id is None:
         return None
 
@@ -33,17 +43,25 @@ def reply_to_data(message):
         "id": reply_to.id,
         "author_id": reply_to.author_id,
         "author_username": reply_to.author.username,
+        "author_avatar_url": get_user_avatar_url(
+            reply_to.author,
+        ),
         "text": (None if reply_to.is_deleted else reply_to.text),
         "is_deleted": reply_to.is_deleted,
     }
 
 
-def message_to_data(message):
+def message_to_data(
+    message,
+):
     return {
         "id": message.id,
         "channel_id": message.channel_id,
         "author_id": message.author_id,
         "author_username": message.author.username,
+        "author_avatar_url": get_user_avatar_url(
+            message.author,
+        ),
         "reply_to": message.reply_to_id,
         "reply_to_message": reply_to_data(
             message,

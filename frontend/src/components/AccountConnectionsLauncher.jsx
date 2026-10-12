@@ -1,3 +1,6 @@
+import UserAvatar from "./UserAvatar";
+
+
 function AccountConnectionsLauncher({
   user,
   logout,
@@ -5,20 +8,15 @@ function AccountConnectionsLauncher({
   return (
     <>
       <div className="dashboard-user">
-        <div className="dashboard-avatar">
-          {user.avatar_url ? (
-            <img
-              src={
-                user.avatar_url
-              }
-              alt=""
-            />
-          ) : (
+        <UserAvatar
+          className="dashboard-avatar"
+          username={
             user.username
-              .slice(0, 1)
-              .toUpperCase()
-          )}
-        </div>
+          }
+          avatarUrl={
+            user.avatar_url
+          }
+        />
 
         <div>
           <strong>

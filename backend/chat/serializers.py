@@ -1,5 +1,11 @@
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import (
+    extend_schema_field,
+)
 from rest_framework import serializers
+
+from accounts.avatar_utils import (
+    get_user_avatar_url,
+)
 
 from .models import (
     Channel,
@@ -8,9 +14,12 @@ from .models import (
 )
 
 
-class ChannelSerializer(serializers.ModelSerializer):
+class ChannelSerializer(
+    serializers.ModelSerializer,
+):
     class Meta:
         model = Channel
+
         fields = (
             "id",
             "workspace",
@@ -33,9 +42,12 @@ class ChannelSerializer(serializers.ModelSerializer):
         )
 
 
-class ChannelCreateSerializer(serializers.ModelSerializer):
+class ChannelCreateSerializer(
+    serializers.ModelSerializer,
+):
     class Meta:
         model = Channel
+
         fields = (
             "name",
             "description",
@@ -43,69 +55,107 @@ class ChannelCreateSerializer(serializers.ModelSerializer):
         )
 
 
-class ChannelMembershipSerializer(serializers.ModelSerializer):
+class ChannelMembershipSerializer(
+    serializers.ModelSerializer,
+):
     user_id = serializers.IntegerField(
         source="user.id",
         read_only=True,
     )
+
     username = serializers.CharField(
         source="user.username",
         read_only=True,
     )
+
     email = serializers.EmailField(
         source="user.email",
         read_only=True,
     )
 
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = ChannelMembership
+
         fields = (
             "id",
             "user_id",
             "username",
             "email",
+            "avatar_url",
             "joined_at",
         )
 
+    def get_avatar_url(
+        self,
+        membership,
+    ) -> str | None:
+        return get_user_avatar_url(
+            membership.user,
+            request=self.context.get(
+                "request",
+            ),
+        )
 
-class ChannelMemberAddSerializer(serializers.Serializer):
+
+class ChannelMemberAddSerializer(
+    serializers.Serializer,
+):
     user_id = serializers.IntegerField()
 
 
-class ReplyToMessageSerializer(serializers.Serializer):
+class ReplyToMessageSerializer(
+    serializers.Serializer,
+):
     id = serializers.IntegerField(
         read_only=True,
     )
+
     author_id = serializers.IntegerField(
         read_only=True,
     )
+
     author_username = serializers.CharField(
         read_only=True,
     )
+
+    author_avatar_url = serializers.CharField(
+        allow_null=True,
+        read_only=True,
+    )
+
     text = serializers.CharField(
         allow_null=True,
         read_only=True,
     )
+
     is_deleted = serializers.BooleanField(
         read_only=True,
     )
 
 
-class MessageSerializer(serializers.ModelSerializer):
+class MessageSerializer(
+    serializers.ModelSerializer,
+):
     author_username = serializers.CharField(
         source="author.username",
         read_only=True,
     )
 
+    author_avatar_url = serializers.SerializerMethodField()
+
     reply_to_message = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
+
         fields = (
             "id",
             "channel",
             "author",
             "author_username",
+            "author_avatar_url",
             "reply_to",
             "reply_to_message",
             "text",
@@ -120,6 +170,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "channel",
             "author",
             "author_username",
+            "author_avatar_url",
             "reply_to",
             "reply_to_message",
             "created_at",
@@ -128,8 +179,22 @@ class MessageSerializer(serializers.ModelSerializer):
             "is_deleted",
         )
 
+    def get_author_avatar_url(
+        self,
+        message,
+    ) -> str | None:
+        return get_user_avatar_url(
+            message.author,
+            request=self.context.get(
+                "request",
+            ),
+        )
+
     @extend_schema_field(ReplyToMessageSerializer)
-    def get_reply_to_message(self, instance):
+    def get_reply_to_message(
+        self,
+        instance,
+    ):
         if instance.reply_to_id is None:
             return None
 
@@ -138,13 +203,26 @@ class MessageSerializer(serializers.ModelSerializer):
         return {
             "id": reply_to.id,
             "author_id": reply_to.author_id,
-            "author_username": reply_to.author.username,
+            "author_username": (reply_to.author.username),
+            "author_avatar_url": (
+                get_user_avatar_url(
+                    reply_to.author,
+                    request=self.context.get(
+                        "request",
+                    ),
+                )
+            ),
             "text": (None if reply_to.is_deleted else reply_to.text),
-            "is_deleted": reply_to.is_deleted,
+            "is_deleted": (reply_to.is_deleted),
         }
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
+    def to_representation(
+        self,
+        instance,
+    ):
+        data = super().to_representation(
+            instance,
+        )
 
         if instance.is_deleted:
             data["text"] = None

@@ -14,6 +14,10 @@ import {
   readApiError,
   setTokens,
 } from "../api/client";
+import {
+  applyInterfaceScale,
+  DEFAULT_INTERFACE_SCALE_LEVEL,
+} from "../utils/interfaceScale";
 
 
 const AuthContext = createContext(null);
@@ -29,6 +33,14 @@ export function AuthProvider({
   const [loading, setLoading] =
     useState(true);
 
+  useEffect(() => {
+    applyInterfaceScale(
+      user?.interface_scale_level ??
+        DEFAULT_INTERFACE_SCALE_LEVEL,
+    );
+  }, [
+    user?.interface_scale_level,
+  ]);
 
   const loadUser = useCallback(
     async () => {

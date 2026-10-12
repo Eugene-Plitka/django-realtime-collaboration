@@ -1,5 +1,9 @@
 from rest_framework import serializers
 
+from accounts.avatar_utils import (
+    get_user_avatar_url,
+)
+
 from .models import (
     Workspace,
     WorkspaceInvitation,
@@ -7,9 +11,12 @@ from .models import (
 )
 
 
-class WorkspaceSerializer(serializers.ModelSerializer):
+class WorkspaceSerializer(
+    serializers.ModelSerializer,
+):
     class Meta:
         model = Workspace
+
         fields = (
             "id",
             "name",
@@ -27,48 +34,87 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         )
 
 
-class WorkspaceNameUpdateSerializer(serializers.ModelSerializer):
+class WorkspaceNameUpdateSerializer(
+    serializers.ModelSerializer,
+):
     class Meta:
         model = Workspace
         fields = ("name",)
 
 
-class WorkspaceMembershipSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(source="user.id", read_only=True)
-    username = serializers.CharField(source="user.username", read_only=True)
-    email = serializers.EmailField(source="user.email", read_only=True)
+class WorkspaceMembershipSerializer(
+    serializers.ModelSerializer,
+):
+    user_id = serializers.IntegerField(
+        source="user.id",
+        read_only=True,
+    )
+
+    username = serializers.CharField(
+        source="user.username",
+        read_only=True,
+    )
+
+    email = serializers.EmailField(
+        source="user.email",
+        read_only=True,
+    )
+
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkspaceMembership
+
         fields = (
             "id",
             "user_id",
             "username",
             "email",
+            "avatar_url",
             "role",
             "joined_at",
         )
 
+    def get_avatar_url(
+        self,
+        membership,
+    ) -> str | None:
+        return get_user_avatar_url(
+            membership.user,
+            request=self.context.get(
+                "request",
+            ),
+        )
 
-class WorkspaceMembershipRoleSerializer(serializers.ModelSerializer):
+
+class WorkspaceMembershipRoleSerializer(
+    serializers.ModelSerializer,
+):
     class Meta:
         model = WorkspaceMembership
         fields = ("role",)
 
-    def validate_role(self, value):
+    def validate_role(
+        self,
+        value,
+    ):
         if value == WorkspaceMembership.Role.OWNER:
             raise serializers.ValidationError(
-                "Owner role can only be assigned through ownership transfer."
+                ("Owner role can only be assigned through ownership transfer.")
             )
 
         return value
 
 
-class TransferOwnershipSerializer(serializers.Serializer):
+class TransferOwnershipSerializer(
+    serializers.Serializer,
+):
     membership_id = serializers.IntegerField()
 
 
-class AddWorkspaceMemberSerializer(serializers.Serializer):
+class AddWorkspaceMemberSerializer(
+    serializers.Serializer,
+):
     user_id = serializers.IntegerField()
 
     role = serializers.ChoiceField(
@@ -80,7 +126,9 @@ class AddWorkspaceMemberSerializer(serializers.Serializer):
     )
 
 
-class WorkspaceInvitationCreateSerializer(serializers.Serializer):
+class WorkspaceInvitationCreateSerializer(
+    serializers.Serializer,
+):
     email = serializers.EmailField()
 
     role = serializers.ChoiceField(
@@ -92,7 +140,9 @@ class WorkspaceInvitationCreateSerializer(serializers.Serializer):
     )
 
 
-class WorkspaceInvitationSerializer(serializers.ModelSerializer):
+class WorkspaceInvitationSerializer(
+    serializers.ModelSerializer,
+):
     workspace_name = serializers.CharField(
         source="workspace.name",
         read_only=True,
@@ -105,6 +155,7 @@ class WorkspaceInvitationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkspaceInvitation
+
         fields = (
             "id",
             "workspace",

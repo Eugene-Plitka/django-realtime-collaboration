@@ -9,6 +9,10 @@ import {
   readApiError,
 } from "../api/client";
 import SignInMethodsSettings from "./SignInMethodsSettings";
+import {
+  applyInterfaceScale,
+  getInterfaceScaleLabel,
+} from "../utils/interfaceScale";
 
 
 const AVATAR_COLORS = [
@@ -534,7 +538,146 @@ function ProfileSettings({
 }
 
 
-function AppearanceSettings() {
+function AppearanceSettings({
+  user,
+  onUserChanged,
+}) {
+  const [
+    scaleLevel,
+    setScaleLevel,
+  ] = useState(
+    user.interface_scale_level ??
+      3,
+  );
+
+  const [
+    savingScale,
+    setSavingScale,
+  ] = useState(false);
+
+  const [
+    scaleError,
+    setScaleError,
+  ] = useState("");
+
+  const [
+    scaleSaved,
+    setScaleSaved,
+  ] = useState(false);
+
+
+  useEffect(() => {
+    const userLevel =
+      user.interface_scale_level ??
+      3;
+
+    setScaleLevel(
+      userLevel,
+    );
+
+    applyInterfaceScale(
+      userLevel,
+    );
+  }, [
+    user.interface_scale_level,
+  ]);
+
+
+  async function saveScale(
+    nextLevel,
+  ) {
+    setSavingScale(true);
+    setScaleError("");
+    setScaleSaved(false);
+
+    try {
+      const response =
+        await apiRequest(
+          "/api/auth/me/",
+          {
+            method: "PATCH",
+            body: {
+              interface_scale_level:
+                nextLevel,
+            },
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(
+            response,
+            "Unable to save appearance settings.",
+          ),
+        );
+      }
+
+      await onUserChanged();
+
+      setScaleSaved(true);
+    } catch (requestError) {
+      setScaleError(
+        requestError.message,
+      );
+
+      const previousLevel =
+        user.interface_scale_level ??
+        3;
+
+      setScaleLevel(
+        previousLevel,
+      );
+
+      applyInterfaceScale(
+        previousLevel,
+      );
+    } finally {
+      setSavingScale(false);
+    }
+  }
+
+
+  function handleScaleChange(
+    event,
+  ) {
+    const nextLevel =
+      Number(
+        event.target.value,
+      );
+
+    setScaleLevel(
+      nextLevel,
+    );
+
+    setScaleSaved(false);
+    setScaleError("");
+
+    applyInterfaceScale(
+      nextLevel,
+    );
+  }
+
+
+  function handleScaleCommit() {
+    if (
+      scaleLevel ===
+      user.interface_scale_level
+    ) {
+      return;
+    }
+
+    saveScale(
+      scaleLevel,
+    );
+  }
+
+
+  const percentage =
+    getInterfaceScaleLabel(
+      scaleLevel,
+    );
+
+
   return (
     <div className="settings-page">
       <div className="settings-page-inner">
@@ -553,7 +696,19 @@ function AppearanceSettings() {
           </p>
         </header>
 
-        <section className="settings-card">
+        {scaleError && (
+          <div className="settings-message error">
+            {scaleError}
+          </div>
+        )}
+
+        {scaleSaved && (
+          <div className="settings-message success">
+            Appearance preference saved.
+          </div>
+        )}
+
+        <section className="settings-card settings-appearance-card">
           <div className="settings-card-heading">
             <div>
               <h2>
@@ -561,41 +716,130 @@ function AppearanceSettings() {
               </h2>
 
               <p>
-                Adjust the interface text
-                size across CollabSpace.
+                Adjust the text size across
+                CollabSpace without changing
+                the interface layout.
               </p>
             </div>
 
-            <span className="settings-coming-badge">
-              Next step
+            <span className="settings-scale-value">
+              {percentage}%
             </span>
           </div>
 
-          <div className="settings-preview-row">
-            <span>
-              Smaller
-            </span>
+          <div className="settings-scale-control">
+            <div className="settings-scale-labels">
+              <span>
+                Smaller
+              </span>
 
-            <div className="settings-preview-track">
-              <i />
-              <i />
-              <i className="active" />
-              <i />
-              <i />
-              <i />
-              <i />
+              <span>
+                Default
+              </span>
+
+              <span>
+                Larger
+              </span>
             </div>
 
-            <span>
-              Larger
-            </span>
+            <input
+              className="settings-scale-range"
+              type="range"
+              min="0"
+              max="6"
+              step="1"
+              value={
+                scaleLevel
+              }
+              disabled={
+                savingScale
+              }
+              aria-label="Font size"
+              onChange={
+                handleScaleChange
+              }
+              onMouseUp={
+                handleScaleCommit
+              }
+              onTouchEnd={
+                handleScaleCommit
+              }
+              onKeyUp={
+                handleScaleCommit
+              }
+            />
+
+            <div className="settings-scale-points">
+              {[
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+              ].map(
+                (level) => (
+                  <span
+                    className={
+                      level ===
+                      scaleLevel
+                        ? "active"
+                        : level === 3
+                          ? "default"
+                          : ""
+                    }
+                    key={
+                      level
+                    }
+                  />
+                ),
+              )}
+            </div>
+          </div>
+
+          <div className="settings-appearance-preview">
+            <div>
+              <span>
+                Preview
+              </span>
+
+              <strong>
+                CollabSpace
+              </strong>
+
+              <p>
+                Messages, channels,
+                settings and controls keep
+                their original dimensions.
+                Only text size changes.
+              </p>
+            </div>
+
+            <div className="settings-preview-message">
+              <span>
+                E
+              </span>
+
+              <div>
+                <strong>
+                  Eugene
+                </strong>
+
+                <p>
+                  This is how text will look
+                  at the selected font size.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="settings-info-box">
-            The third position will be the
-            default size. Your preference
-            will be saved and restored
-            automatically.
+            The center position is the
+            default 100% font size. Smaller
+            and larger positions only change
+            text size and do not resize the
+            interface layout.
           </div>
         </section>
       </div>
@@ -706,7 +950,12 @@ function SettingsContent({
     section === "appearance"
   ) {
     return (
-      <AppearanceSettings />
+      <AppearanceSettings
+        user={user}
+        onUserChanged={
+          onUserChanged
+        }
+      />
     );
   }
 

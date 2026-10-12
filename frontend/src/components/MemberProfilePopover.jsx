@@ -1,3 +1,6 @@
+import UserAvatar from "./UserAvatar";
+
+
 function MemberProfilePopover({
   member,
   onClose,
@@ -36,11 +39,15 @@ function MemberProfilePopover({
 
         <div className="member-profile-banner" />
 
-        <div className="member-profile-avatar">
-          {member.username
-            ?.slice(0, 1)
-            .toUpperCase()}
-        </div>
+        <UserAvatar
+          className="member-profile-avatar"
+          username={
+            member.username
+          }
+          avatarUrl={
+            member.avatar_url
+          }
+        />
 
         <div className="member-profile-content">
           <h2>

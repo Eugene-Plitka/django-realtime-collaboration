@@ -681,3 +681,74 @@ class ChangePasswordTests(
             response.status_code,
             status.HTTP_400_BAD_REQUEST,
         )
+
+
+class InterfaceScaleTests(
+    APITestCase,
+):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="appearance@example.com",
+            username="appearance-user",
+            password="StrongPassword123!",
+        )
+
+        self.client.force_authenticate(
+            user=self.user,
+        )
+
+    def test_default_interface_scale_is_standard(
+        self,
+    ):
+        response = self.client.get(
+            reverse("me"),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["interface_scale_level"],
+            3,
+        )
+
+    def test_user_can_update_interface_scale(
+        self,
+    ):
+        response = self.client.patch(
+            reverse("me"),
+            {
+                "interface_scale_level": 5,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertEqual(
+            self.user.interface_scale_level,
+            5,
+        )
+
+    def test_invalid_interface_scale_is_rejected(
+        self,
+    ):
+        response = self.client.patch(
+            reverse("me"),
+            {
+                "interface_scale_level": 7,
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
