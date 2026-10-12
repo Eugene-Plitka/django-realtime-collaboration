@@ -8,13 +8,19 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.authentication import SessionAuthentication
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+)
 from rest_framework.exceptions import NotFound
 from rest_framework.parsers import (
     FormParser,
     MultiPartParser,
 )
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+)
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -28,6 +34,10 @@ from .serializers import (
     SocialConnectResponseSerializer,
     SocialJWTExchangeResponseSerializer,
     UserSerializer,
+)
+from .services import (
+    clear_social_avatar,
+    sync_social_avatar,
 )
 
 SOCIAL_PROVIDERS = {
@@ -179,16 +189,24 @@ class SocialJWTExchangeView(generics.GenericAPIView):
         },
     )
     def post(self, request):
+        sync_social_avatar(
+            request.user,
+        )
+
         refresh = RefreshToken.for_user(
             request.user,
         )
 
         response_data = {
             "refresh": str(refresh),
-            "access": str(refresh.access_token),
+            "access": str(
+                refresh.access_token,
+            ),
         }
 
-        django_logout(request)
+        django_logout(
+            request,
+        )
 
         return Response(
             response_data,
@@ -342,6 +360,23 @@ class SocialDisconnectView(generics.GenericAPIView):
             )
 
         social_account.delete()
+
+        remaining_social_accounts = SocialAccount.objects.filter(
+            user=request.user,
+            provider__in=(
+                "google",
+                "github",
+            ),
+        ).exists()
+
+        if remaining_social_accounts:
+            sync_social_avatar(
+                request.user,
+            )
+        else:
+            clear_social_avatar(
+                request.user,
+            )
 
         return Response(
             status=status.HTTP_204_NO_CONTENT,

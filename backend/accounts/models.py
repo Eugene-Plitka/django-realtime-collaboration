@@ -11,6 +11,17 @@ class User(AbstractUser):
         blank=True,
     )
 
+    social_avatar = models.ImageField(
+        upload_to="social_avatars/",
+        null=True,
+        blank=True,
+    )
+
+    social_avatar_provider = models.CharField(
+        max_length=20,
+        blank=True,
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
     )

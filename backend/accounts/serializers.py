@@ -30,12 +30,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(
+    serializers.ModelSerializer,
+):
     avatar_url = serializers.SerializerMethodField()
+
     avatar_source = serializers.SerializerMethodField()
 
     class Meta:
         model = User
+
         fields = (
             "id",
             "email",
@@ -51,72 +55,42 @@ class UserSerializer(serializers.ModelSerializer):
             "avatar_source",
         )
 
-    def get_avatar_url(self, user) -> str | None:
+    def get_avatar_url(
+        self,
+        user,
+    ) -> str | None:
         request = self.context.get(
             "request",
         )
 
+        avatar = None
+
         if user.avatar:
-            avatar_url = user.avatar.url
+            avatar = user.avatar
+        elif user.social_avatar:
+            avatar = user.social_avatar
 
-            if request is not None:
-                return request.build_absolute_uri(
-                    avatar_url,
-                )
+        if avatar is None:
+            return None
 
-            return avatar_url
+        avatar_url = avatar.url
 
-        social_accounts = {
-            social_account.provider: social_account.extra_data
-            for social_account in user.socialaccount_set.all()
-        }
+        if request is not None:
+            return request.build_absolute_uri(
+                avatar_url,
+            )
 
-        google_data = social_accounts.get(
-            "google",
-            {},
-        )
+        return avatar_url
 
-        google_avatar = google_data.get(
-            "picture",
-        )
-
-        if google_avatar:
-            return google_avatar
-
-        github_data = social_accounts.get(
-            "github",
-            {},
-        )
-
-        github_avatar = github_data.get(
-            "avatar_url",
-        )
-
-        if github_avatar:
-            return github_avatar
-
-        return None
-
-    def get_avatar_source(self, user) -> str:
+    def get_avatar_source(
+        self,
+        user,
+    ) -> str:
         if user.avatar:
             return "custom"
 
-        social_accounts = {
-            social_account.provider: social_account.extra_data
-            for social_account in user.socialaccount_set.all()
-        }
-
-        if social_accounts.get(
-            "google",
-            {},
-        ).get("picture"):
-            return "google"
-
-        if social_accounts.get(
-            "github",
-            {},
-        ).get("avatar_url"):
-            return "github"
+        if user.social_avatar:
+            return user.social_avatar_provider or "social"
 
         return "fallback"
 

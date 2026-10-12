@@ -55,6 +55,7 @@ function DashboardPage() {
   const {
     user,
     logout,
+    loadUser,
   } = useAuth();
 
   const {
@@ -1217,6 +1218,9 @@ function DashboardPage() {
                 settingsSection
               }
               user={user}
+              onUserChanged={
+                loadUser
+              }
             />
           ) : (
             <>
