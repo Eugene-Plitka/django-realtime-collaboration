@@ -16,6 +16,7 @@ import ChannelActionsMenu from "../components/ChannelActionsMenu";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
 import HeaderActivityControls from "../components/HeaderActivityControls";
+import WorkspaceActionsMenu from "../components/WorkspaceActionsMenu";
 import WorkspaceMembersPanel from "../components/WorkspaceMembersPanel";
 import { useNotifications } from "../notifications/useNotifications";
 
@@ -410,6 +411,57 @@ function DashboardPage() {
     setMainView("chat");
   }
 
+  function handleWorkspaceUpdated(
+    updatedWorkspace,
+  ) {
+    setWorkspaces(
+      (currentWorkspaces) =>
+        currentWorkspaces.map(
+          (workspace) =>
+            workspace.id ===
+            updatedWorkspace.id
+              ? updatedWorkspace
+              : workspace,
+        ),
+    );
+
+    setActiveWorkspace(
+      (currentWorkspace) =>
+        currentWorkspace?.id ===
+        updatedWorkspace.id
+          ? updatedWorkspace
+          : currentWorkspace,
+    );
+  }
+
+
+  function handleWorkspaceRemoved(
+    removedWorkspace,
+  ) {
+    const remainingWorkspaces =
+      workspaces.filter(
+        (workspace) =>
+          workspace.id !==
+          removedWorkspace.id,
+      );
+
+    setWorkspaces(
+      remainingWorkspaces,
+    );
+
+    const nextWorkspace =
+      remainingWorkspaces[0] ??
+      null;
+
+    setActiveWorkspace(
+      nextWorkspace,
+    );
+
+    setChannels([]);
+    setActiveChannel(null);
+    setWorkspaceRole(null);
+    setMainView("chat");
+  }
 
   function handleChannelCreated(
     channel,
@@ -711,22 +763,23 @@ function DashboardPage() {
               )}
             </div>
 
-            {canManageChannels &&
-              mainView === "chat" && (
-                <button
-                  className="channel-create-icon"
-                  type="button"
-                  title="Create channel"
-                  aria-label="Create channel"
-                  onClick={() =>
-                    setCreateChannelModalOpen(
-                      true,
-                    )
-                  }
-                >
-                  +
-                </button>
-              )}
+            {activeWorkspace && (
+              <WorkspaceActionsMenu
+                key={activeWorkspace.id}
+                workspace={
+                  activeWorkspace
+                }
+                workspaceRole={
+                  workspaceRole
+                }
+                onWorkspaceUpdated={
+                  handleWorkspaceUpdated
+                }
+                onWorkspaceRemoved={
+                  handleWorkspaceRemoved
+                }
+              />
+            )}
           </div>
 
           {activeWorkspace && (

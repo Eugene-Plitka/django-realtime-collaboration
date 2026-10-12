@@ -2527,6 +2527,39 @@ div {
   font-size: 12px;
 }
 
+.message-author-button {
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+  color: #e5e9f2;
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  transition:
+    color 120ms ease;
+}
+
+
+.message-author-button:hover {
+  color: #9aa6ff;
+  text-decoration: underline;
+}
+
+
+.message-author-button:focus-visible {
+  outline: none;
+
+  color: #aab4ff;
+
+  text-decoration: underline;
+}
+
 .message-you {
   padding: 1px 4px;
   border-radius: 4px;
@@ -6600,4 +6633,439 @@ button:disabled {
   border-radius: 14px;
 
   background-size: 125%;
+}
+
+/* Workspace actions */
+
+.workspace-actions-root {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+
+.workspace-more-button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+
+  padding: 0;
+
+  border:
+    1px solid #2b3850;
+  border-radius: 8px;
+
+  background: #151f30;
+  color: #8996aa;
+
+  cursor: pointer;
+
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+
+.workspace-more-button:hover,
+.workspace-more-button[aria-expanded="true"] {
+  border-color: #5062df;
+
+  background:
+    rgba(70, 89, 245, 0.14);
+
+  color: #e3e7ef;
+}
+
+
+.workspace-actions-popover {
+  position: absolute;
+  z-index: 300;
+  top: calc(100% + 9px);
+  right: 0;
+
+  width: 310px;
+  overflow: hidden;
+
+  border:
+    1px solid #2a384f;
+  border-radius: 13px;
+
+  background: #111a29;
+
+  box-shadow:
+    0 24px 65px
+    rgba(0, 0, 0, 0.5);
+}
+
+
+.workspace-actions-heading {
+  display: flex;
+  align-items: center;
+
+  min-height: 64px;
+  gap: 10px;
+  padding: 13px 14px;
+
+  border-bottom:
+    1px solid #202c40;
+}
+
+
+.workspace-actions-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+
+
+.workspace-actions-heading strong,
+.workspace-actions-heading span {
+  display: block;
+}
+
+
+.workspace-actions-heading strong {
+  overflow: hidden;
+
+  color: #e4e8f0;
+
+  font-size: 12px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.workspace-actions-heading span {
+  margin-top: 4px;
+
+  color: #728096;
+
+  font-size: 8px;
+}
+
+
+.workspace-actions-heading > button {
+  display: grid;
+  flex: 0 0 auto;
+
+  width: 28px;
+  height: 28px;
+  place-items: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 6px;
+
+  background: transparent;
+  color: #758299;
+
+  cursor: pointer;
+
+  font-size: 18px;
+}
+
+
+.workspace-actions-heading > button:hover {
+  background: #1a2538;
+  color: #d6dce7;
+}
+
+
+.workspace-actions-back {
+  font-size: 14px !important;
+}
+
+
+.workspace-actions-error {
+  padding: 9px 13px;
+
+  border-bottom:
+    1px solid
+    rgba(248, 113, 113, 0.15);
+
+  background:
+    rgba(127, 29, 29, 0.15);
+
+  color: #f2a0aa;
+
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+
+.workspace-actions-menu {
+  display: grid;
+  padding: 7px;
+}
+
+
+.workspace-actions-menu > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  min-height: 40px;
+  padding: 0 10px;
+
+  border: 0;
+  border-radius: 7px;
+
+  background: transparent;
+  color: #a2aec0;
+
+  cursor: pointer;
+
+  font-size: 10px;
+  text-align: left;
+}
+
+
+.workspace-actions-menu > button:hover:not(:disabled) {
+  background: #182235;
+  color: #d8deea;
+}
+
+
+.workspace-actions-menu > button small {
+  margin-left: 12px;
+
+  color: #65738a;
+
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+
+.workspace-actions-menu > button.danger {
+  color: #d58b98;
+}
+
+
+.workspace-actions-menu > button.danger:hover:not(:disabled) {
+  background:
+    rgba(127, 29, 29, 0.15);
+
+  color: #f29eaa;
+}
+
+
+.workspace-actions-menu > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+
+.workspace-action-confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  min-height: 40px;
+  padding:
+    0 6px 0 10px;
+
+  border-radius: 7px;
+
+  background:
+    rgba(127, 29, 29, 0.1);
+}
+
+
+.workspace-action-confirmation > span {
+  color: #d495a0;
+
+  font-size: 9px;
+}
+
+
+.workspace-action-confirmation > div {
+  display: flex;
+  gap: 4px;
+}
+
+
+.workspace-action-confirmation button {
+  display: grid;
+
+  width: 29px;
+  height: 29px;
+  place-items: center;
+
+  padding: 0;
+
+  border:
+    1px solid #3a4658;
+  border-radius: 6px;
+
+  background: transparent;
+  color: #8490a4;
+
+  cursor: pointer;
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+
+.workspace-action-confirmation
+button.confirm:hover:not(:disabled) {
+  border-color:
+    rgba(74, 222, 128, 0.35);
+
+  background:
+    rgba(34, 197, 94, 0.12);
+
+  color: #4ade80;
+}
+
+
+.workspace-action-confirmation
+button.confirm-danger:hover:not(:disabled) {
+  border-color:
+    rgba(248, 113, 113, 0.38);
+
+  background:
+    rgba(239, 68, 68, 0.14);
+
+  color: #f87171;
+}
+
+
+.workspace-action-confirmation
+button.cancel:hover:not(:disabled) {
+  border-color: #59677c;
+  background: #1a2538;
+  color: #d5dce8;
+}
+
+
+.workspace-action-confirmation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+.workspace-edit-form {
+  display: grid;
+  gap: 15px;
+
+  padding: 15px;
+}
+
+
+.workspace-edit-form label {
+  display: grid;
+  gap: 7px;
+}
+
+
+.workspace-edit-form label > span {
+  color: #7b899f;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+
+.workspace-edit-form input {
+  width: 100%;
+  height: 37px;
+
+  padding: 0 10px;
+
+  border:
+    1px solid #2c3a52;
+  border-radius: 8px;
+  outline: none;
+
+  background: #0e1725;
+  color: #dfe4ed;
+
+  font: inherit;
+  font-size: 10px;
+}
+
+
+.workspace-edit-form input:focus {
+  border-color: #596bef;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(89, 107, 239, 0.08);
+}
+
+
+.workspace-edit-note {
+  padding: 10px 11px;
+
+  border:
+    1px solid #303d54;
+  border-radius: 7px;
+
+  background: #151f2f;
+  color: #75839a;
+
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+
+.workspace-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+
+.workspace-edit-actions button {
+  height: 32px;
+  padding: 0 12px;
+
+  border-radius: 7px;
+
+  cursor: pointer;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+
+.workspace-edit-actions button.secondary {
+  border:
+    1px solid #303e56;
+
+  background: transparent;
+  color: #8a97aa;
+}
+
+
+.workspace-edit-actions button.primary {
+  border: 0;
+
+  background: #5266ef;
+  color: #fff;
+}
+
+
+.workspace-edit-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+@media (max-width: 600px) {
+  .workspace-actions-popover {
+    position: fixed;
+    top: 78px;
+    right: 12px;
+    left: 12px;
+
+    width: auto;
+  }
 }

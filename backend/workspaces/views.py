@@ -27,6 +27,7 @@ from .serializers import (
     WorkspaceInvitationSerializer,
     WorkspaceMembershipRoleSerializer,
     WorkspaceMembershipSerializer,
+    WorkspaceNameUpdateSerializer,
     WorkspaceSerializer,
 )
 from .services import (
@@ -61,14 +62,55 @@ class WorkspaceListCreateView(generics.ListCreateAPIView):
         serializer.instance = workspace
 
 
-class WorkspaceDetailView(generics.RetrieveAPIView):
-    serializer_class = WorkspaceSerializer
-    permission_classes = [IsAuthenticated]
+class WorkspaceDetailView(
+    generics.RetrieveUpdateDestroyAPIView,
+):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+    http_method_names = [
+        "get",
+        "patch",
+        "delete",
+    ]
 
     def get_queryset(self):
         return Workspace.objects.filter(
             memberships__user=self.request.user,
         ).distinct()
+
+    def get_serializer_class(self):
+        if self.request.method == "PATCH":
+            return WorkspaceNameUpdateSerializer
+
+        return WorkspaceSerializer
+
+    def perform_update(self, serializer):
+        workspace = serializer.instance
+
+        membership = get_workspace_membership(
+            workspace=workspace,
+            user=self.request.user,
+        )
+
+        if membership is None or membership.role not in {
+            WorkspaceMembership.Role.OWNER,
+            WorkspaceMembership.Role.ADMIN,
+        }:
+            raise PermissionDenied("You cannot edit this workspace.")
+
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        membership = get_workspace_membership(
+            workspace=instance,
+            user=self.request.user,
+        )
+
+        if membership is None or membership.role != WorkspaceMembership.Role.OWNER:
+            raise PermissionDenied("Only the workspace owner can delete the workspace.")
+
+        instance.delete()
 
 
 class WorkspaceMemberListView(generics.ListAPIView):

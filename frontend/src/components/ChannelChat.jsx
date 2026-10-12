@@ -1446,7 +1446,7 @@ function ChannelChat({
   }
 
 
-  function openMentionProfile(
+  function openMemberProfile(
     username,
   ) {
     const member =
@@ -1518,7 +1518,7 @@ function ChannelChat({
             type="button"
             key={`mention-${index}`}
             onClick={() =>
-              openMentionProfile(
+              openMemberProfile(
                 member.username,
               )
             }
@@ -1774,11 +1774,17 @@ function ChannelChat({
                         )}
 
                         <div className="message-meta">
-                          <strong>
-                            {
-                              message.author_username
+                          <button
+                            className="message-author-button"
+                            type="button"
+                            onClick={() =>
+                              openMemberProfile(
+                                message.author_username,
+                              )
                             }
-                          </strong>
+                          >
+                            {message.author_username}
+                          </button>
 
                           {isOwn && (
                             <span className="message-you">

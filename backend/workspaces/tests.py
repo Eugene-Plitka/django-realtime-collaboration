@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import (
+    Workspace,
     WorkspaceInvitation,
     WorkspaceMembership,
 )
@@ -1536,6 +1537,195 @@ class WorkspaceAPITests(APITestCase):
             ChannelMembership.objects.filter(
                 channel=general_channel,
                 user=guest,
+            ).exists()
+        )
+
+    def test_owner_can_update_workspace_name(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        response = self.client.patch(
+            reverse(
+                "workspace-detail",
+                kwargs={
+                    "pk": workspace.id,
+                },
+            ),
+            {
+                "name": "Acme Engineering",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        workspace.refresh_from_db()
+
+        self.assertEqual(
+            workspace.name,
+            "Acme Engineering",
+        )
+
+        self.assertEqual(
+            workspace.slug,
+            "acme-development",
+        )
+
+    def test_admin_can_update_workspace_name(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        admin = User.objects.create_user(
+            email="admin@example.com",
+            username="admin",
+            password="StrongPassword123!",
+        )
+
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=admin,
+            role=WorkspaceMembership.Role.ADMIN,
+        )
+
+        self.client.force_authenticate(
+            user=admin,
+        )
+
+        response = self.client.patch(
+            reverse(
+                "workspace-detail",
+                kwargs={
+                    "pk": workspace.id,
+                },
+            ),
+            {
+                "name": "Acme Engineering",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+    def test_member_cannot_update_workspace_name(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        member = User.objects.create_user(
+            email="member@example.com",
+            username="member",
+            password="StrongPassword123!",
+        )
+
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(
+            user=member,
+        )
+
+        response = self.client.patch(
+            reverse(
+                "workspace-detail",
+                kwargs={
+                    "pk": workspace.id,
+                },
+            ),
+            {
+                "name": "Changed name",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_owner_can_delete_workspace(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        response = self.client.delete(
+            reverse(
+                "workspace-detail",
+                kwargs={
+                    "pk": workspace.id,
+                },
+            ),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        self.assertFalse(
+            Workspace.objects.filter(
+                pk=workspace.id,
+            ).exists()
+        )
+
+    def test_admin_cannot_delete_workspace(self):
+        workspace = create_workspace(
+            name="Acme Development",
+            slug="acme-development",
+            user=self.user,
+        )
+
+        admin = User.objects.create_user(
+            email="admin@example.com",
+            username="admin",
+            password="StrongPassword123!",
+        )
+
+        WorkspaceMembership.objects.create(
+            workspace=workspace,
+            user=admin,
+            role=WorkspaceMembership.Role.ADMIN,
+        )
+
+        self.client.force_authenticate(
+            user=admin,
+        )
+
+        response = self.client.delete(
+            reverse(
+                "workspace-detail",
+                kwargs={
+                    "pk": workspace.id,
+                },
+            ),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+        self.assertTrue(
+            Workspace.objects.filter(
+                pk=workspace.id,
             ).exists()
         )
 
