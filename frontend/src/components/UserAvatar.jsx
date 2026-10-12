@@ -142,7 +142,7 @@ function UserAvatar({
         showImage
           ? undefined
           : {
-              backgroundColor:
+              background:
                 avatarColor(
                   username,
                 ),

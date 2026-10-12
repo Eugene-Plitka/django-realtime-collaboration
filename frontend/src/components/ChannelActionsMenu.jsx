@@ -5,21 +5,16 @@ import {
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
+import {
+  createPortal,
+} from "react-dom";
 
 import {
   apiRequest,
   readApiError,
 } from "../api/client";
+import UserAvatar from "./UserAvatar";
 
-
-function initial(username) {
-  return (
-    username
-      ?.slice(0, 1)
-      .toUpperCase() ?? "?"
-  );
-}
 
 
 function ChannelActionsMenu({
@@ -1008,11 +1003,15 @@ function ChannelActionsMenu({
                           membership.id
                         }
                       >
-                        <div className="channel-member-avatar">
-                          {initial(
-                            membership.username,
-                          )}
-                        </div>
+                        <UserAvatar
+                          className="channel-member-avatar"
+                          username={
+                            membership.username
+                          }
+                          avatarUrl={
+                            membership.avatar_url
+                          }
+                        />
 
                         <div className="channel-member-copy">
                           <strong>
@@ -1115,11 +1114,15 @@ function ChannelActionsMenu({
                           member.user_id
                         }
                       >
-                        <div className="channel-member-avatar">
-                          {initial(
-                            member.username,
-                          )}
-                        </div>
+                        <UserAvatar
+                          className="channel-member-avatar"
+                          username={
+                            member.username
+                          }
+                          avatarUrl={
+                            member.avatar_url
+                          }
+                        />
 
                         <div className="channel-member-copy">
                           <strong>

@@ -2490,30 +2490,25 @@ div {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
+
   width: 38px;
   height: 38px;
+
+  overflow: hidden;
+
   border-radius: 11px;
-  background:
-    linear-gradient(
-      145deg,
-      #334564,
-      #202c42
+
+  color: #ffffff;
+
+  font-size:
+    calc(
+      12px *
+      var(--font-scale)
     );
-  color: #d6ddeb;
-  font-size: calc(12px * var(--font-scale));
+
   font-weight: 800;
 }
 
-.chat-message.own
-.message-avatar {
-  background:
-    linear-gradient(
-      145deg,
-      #6172ff,
-      #4057f6
-    );
-  color: #ffffff;
-}
 
 .message-content {
   min-width: 0;
@@ -2949,23 +2944,59 @@ div {
     1px solid #1b2638;
 }
 
-.member-avatar,
+.member-avatar {
+  display: grid;
+  place-items: center;
+
+  width: 38px;
+  height: 38px;
+
+  overflow: hidden;
+
+  border:
+    1px solid #34425c;
+
+  border-radius: 10px;
+
+  color: #ffffff;
+
+  font-size:
+    calc(
+      12px *
+      var(--font-scale)
+    );
+
+  font-weight: 800;
+}
+
+
 .invitation-email-icon {
   display: grid;
   place-items: center;
+
   width: 38px;
   height: 38px;
+
   border:
     1px solid #34425c;
+
   border-radius: 10px;
+
   background:
     linear-gradient(
       145deg,
       #24324d,
       #172238
     );
+
   color: #cfd6e5;
-  font-size: calc(12px * var(--font-scale));
+
+  font-size:
+    calc(
+      12px *
+      var(--font-scale)
+    );
+
   font-weight: 800;
 }
 
@@ -4494,17 +4525,22 @@ button.cancel:hover {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
+
   width: 30px;
   height: 30px;
+
+  overflow: hidden;
+
   border-radius: 8px;
-  background:
-    linear-gradient(
-      145deg,
-      #5668f4,
-      #3048d6
+
+  color: #ffffff;
+
+  font-size:
+    calc(
+      10px *
+      var(--font-scale)
     );
-  color: #fff;
-  font-size: calc(10px * var(--font-scale));
+
   font-weight: 800;
 }
 
@@ -4923,12 +4959,22 @@ button.cancel:hover {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
+
   width: 18px;
   height: 18px;
+
+  overflow: hidden;
+
   border-radius: 5px;
-  background: #26344d;
-  color: #bac4d5;
-  font-size: calc(7px * var(--font-scale));
+
+  color: #ffffff;
+
+  font-size:
+    calc(
+      7px *
+      var(--font-scale)
+    );
+
   font-weight: 800;
 }
 
@@ -5280,19 +5326,25 @@ button.cancel:hover {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
+
   width: 36px;
   height: 36px;
+
+  overflow: hidden;
+
   border:
     1px solid #34425d;
+
   border-radius: 9px;
-  background:
-    linear-gradient(
-      145deg,
-      #273650,
-      #18243a
+
+  color: #ffffff;
+
+  font-size:
+    calc(
+      11px *
+      var(--font-scale)
     );
-  color: #d1d8e5;
-  font-size: calc(11px * var(--font-scale));
+
   font-weight: 800;
 }
 

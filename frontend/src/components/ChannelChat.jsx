@@ -14,8 +14,9 @@ import {
 import {
   createChannelSocket,
 } from "../chat/socket";
-import MemberProfilePopover from "./MemberProfilePopover";
 import ChannelActionsMenu from "./ChannelActionsMenu";
+import MemberProfilePopover from "./MemberProfilePopover";
+import UserAvatar from "./UserAvatar";
 
 
 function normalizeMessage(message) {
@@ -29,6 +30,9 @@ function normalizeMessage(message) {
       message.author_id,
     author_username:
       message.author_username,
+    author_avatar_url:
+      message.author_avatar_url ??
+      null,
     reply_to:
       message.reply_to ?? null,
     reply_to_message:
@@ -94,6 +98,9 @@ function syncReplySnapshots(
             changedMessage.author,
           author_username:
             changedMessage.author_username,
+          author_avatar_url:
+            changedMessage.author_avatar_url ??
+            null,
           text:
             changedMessage.is_deleted
               ? null
@@ -134,14 +141,6 @@ function formatMessageTime(value) {
   );
 }
 
-
-function messageInitial(username) {
-  return (
-    username
-      ?.slice(0, 1)
-      .toUpperCase() || "?"
-  );
-}
 
 
 function findMentionAtCursor(
@@ -1730,11 +1729,15 @@ function ChannelChat({
                         message.id
                       }
                     >
-                      <div className="message-avatar">
-                        {messageInitial(
-                          message.author_username,
-                        )}
-                      </div>
+                      <UserAvatar
+                        className="message-avatar"
+                        username={
+                          message.author_username
+                        }
+                        avatarUrl={
+                          message.author_avatar_url
+                        }
+                      />
 
                       <div className="message-content">
                         {message.reply_to_message && (
@@ -1749,12 +1752,17 @@ function ChannelChat({
                           >
                             <span className="reply-reference-line" />
 
-                            <span className="reply-reference-avatar">
-                              {messageInitial(
+                            <UserAvatar
+                              className="reply-reference-avatar"
+                              username={
                                 message.reply_to_message
-                                  .author_username,
-                              )}
-                            </span>
+                                  .author_username
+                              }
+                              avatarUrl={
+                                message.reply_to_message
+                                  .author_avatar_url
+                              }
+                            />
 
                             <strong>
                               {
@@ -2100,11 +2108,15 @@ function ChannelChat({
                       );
                     }}
                   >
-                    <span className="mention-suggestion-avatar">
-                      {messageInitial(
-                        member.username,
-                      )}
-                    </span>
+                    <UserAvatar
+                      className="mention-suggestion-avatar"
+                      username={
+                        member.username
+                      }
+                      avatarUrl={
+                        member.avatar_url
+                      }
+                    />
 
                     <span className="mention-suggestion-copy">
                       <strong>

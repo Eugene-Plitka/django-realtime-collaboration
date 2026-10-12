@@ -9,15 +9,8 @@ import {
   readApiError,
 } from "../api/client";
 import InviteMemberModal from "./InviteMemberModal";
+import UserAvatar from "./UserAvatar";
 
-
-function memberInitial(username) {
-  return (
-    username
-      ?.slice(0, 1)
-      .toUpperCase() || "?"
-  );
-}
 
 
 function formatDate(value) {
@@ -468,11 +461,15 @@ function WorkspaceMembersPanel({
                         className="member-row"
                         key={member.id}
                       >
-                        <div className="member-avatar">
-                          {memberInitial(
-                            member.username,
-                          )}
-                        </div>
+                        <UserAvatar
+                          className="member-avatar"
+                          username={
+                            member.username
+                          }
+                          avatarUrl={
+                            member.avatar_url
+                          }
+                        />
 
                         <div className="member-identity">
                           <strong>
