@@ -43,6 +43,7 @@ services:
       - .env.production
     volumes:
       - static_data:/app/staticfiles
+      - media_data:/app/media
     restart: unless-stopped
     depends_on:
       db:
@@ -89,6 +90,7 @@ services:
       - "8080:80"
     volumes:
       - static_data:/var/www/static:ro
+      - media_data:/var/www/media:ro
     restart: unless-stopped
     depends_on:
       web:
@@ -110,3 +112,4 @@ services:
 volumes:
   postgres_data:
   static_data:
+  media_data:

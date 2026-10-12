@@ -31,13 +31,125 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+    avatar_source = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = (
             "id",
             "email",
             "username",
+            "avatar_url",
+            "avatar_source",
         )
+
+        read_only_fields = (
+            "id",
+            "email",
+            "avatar_url",
+            "avatar_source",
+        )
+
+    def get_avatar_url(self, user) -> str | None:
+        request = self.context.get(
+            "request",
+        )
+
+        if user.avatar:
+            avatar_url = user.avatar.url
+
+            if request is not None:
+                return request.build_absolute_uri(
+                    avatar_url,
+                )
+
+            return avatar_url
+
+        social_accounts = {
+            social_account.provider: social_account.extra_data
+            for social_account in user.socialaccount_set.all()
+        }
+
+        google_data = social_accounts.get(
+            "google",
+            {},
+        )
+
+        google_avatar = google_data.get(
+            "picture",
+        )
+
+        if google_avatar:
+            return google_avatar
+
+        github_data = social_accounts.get(
+            "github",
+            {},
+        )
+
+        github_avatar = github_data.get(
+            "avatar_url",
+        )
+
+        if github_avatar:
+            return github_avatar
+
+        return None
+
+    def get_avatar_source(self, user) -> str:
+        if user.avatar:
+            return "custom"
+
+        social_accounts = {
+            social_account.provider: social_account.extra_data
+            for social_account in user.socialaccount_set.all()
+        }
+
+        if social_accounts.get(
+            "google",
+            {},
+        ).get("picture"):
+            return "google"
+
+        if social_accounts.get(
+            "github",
+            {},
+        ).get("avatar_url"):
+            return "github"
+
+        return "fallback"
+
+
+class AvatarUploadSerializer(
+    serializers.ModelSerializer,
+):
+    class Meta:
+        model = User
+        fields = ("avatar",)
+
+    def validate_avatar(self, avatar):
+        max_size = 5 * 1024 * 1024
+
+        if avatar.size > max_size:
+            raise serializers.ValidationError("Avatar must be 5 MB or smaller.")
+
+        allowed_content_types = {
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+        }
+
+        content_type = getattr(
+            avatar,
+            "content_type",
+            "",
+        )
+
+        if content_type not in allowed_content_types:
+            raise serializers.ValidationError("Avatar must be JPEG, PNG or WebP.")
+
+        return avatar
 
 
 class LogoutSerializer(serializers.Serializer):

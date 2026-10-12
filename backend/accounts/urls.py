@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from .views import (
+    AvatarView,
     LogoutView,
     MeView,
     RegisterView,
@@ -46,6 +47,11 @@ urlpatterns = [
         "me/",
         MeView.as_view(),
         name="me",
+    ),
+    path(
+        "avatar/",
+        AvatarView.as_view(),
+        name="avatar",
     ),
     path(
         "password/set/",

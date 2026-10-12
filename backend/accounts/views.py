@@ -10,12 +10,17 @@ from rest_framework import generics, status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import NotFound
+from rest_framework.parsers import (
+    FormParser,
+    MultiPartParser,
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
 from .serializers import (
+    AvatarUploadSerializer,
     LogoutSerializer,
     RegisterSerializer,
     SetPasswordSerializer,
@@ -58,12 +63,93 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
 
-class MeView(generics.RetrieveAPIView):
+class MeView(
+    generics.RetrieveUpdateAPIView,
+):
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    http_method_names = [
+        "get",
+        "patch",
+    ]
 
     def get_object(self):
         return self.request.user
+
+
+class AvatarView(
+    generics.GenericAPIView,
+):
+    serializer_class = AvatarUploadSerializer
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    parser_classes = [
+        MultiPartParser,
+        FormParser,
+    ]
+
+    def post(self, request):
+        serializer = self.get_serializer(
+            request.user,
+            data=request.data,
+            partial=True,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        old_avatar = request.user.avatar if request.user.avatar else None
+
+        serializer.save()
+
+        if old_avatar:
+            old_avatar.delete(
+                save=False,
+            )
+
+        response_serializer = UserSerializer(
+            request.user,
+            context={
+                "request": request,
+            },
+        )
+
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+    def delete(self, request):
+        if request.user.avatar:
+            request.user.avatar.delete(
+                save=False,
+            )
+
+            request.user.avatar = None
+
+            request.user.save(
+                update_fields=[
+                    "avatar",
+                ],
+            )
+
+        response_serializer = UserSerializer(
+            request.user,
+            context={
+                "request": request,
+            },
+        )
+
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class LogoutView(generics.GenericAPIView):

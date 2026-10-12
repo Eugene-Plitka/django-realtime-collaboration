@@ -16,6 +16,7 @@ import ChannelActionsMenu from "../components/ChannelActionsMenu";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
 import HeaderActivityControls from "../components/HeaderActivityControls";
+import SettingsContent from "../components/SettingsContent";
 import WorkspaceActionsMenu from "../components/WorkspaceActionsMenu";
 import WorkspaceMembersPanel from "../components/WorkspaceMembersPanel";
 import { useNotifications } from "../notifications/useNotifications";
@@ -91,6 +92,11 @@ function DashboardPage() {
   const [mainView, setMainView] =
     useState("chat");
 
+  const [
+    settingsSection,
+    setSettingsSection,
+  ] = useState("profile");
+  
   const [
     notificationTargetChannelId,
     setNotificationTargetChannelId,
@@ -391,6 +397,21 @@ function DashboardPage() {
     );
 
     setMainView("chat");
+  }
+
+
+  function openSettings() {
+    setNotificationTargetChannelId(
+      null,
+    );
+
+    setSettingsSection(
+      "profile",
+    );
+
+    setMainView(
+      "settings",
+    );
   }
 
 
@@ -702,6 +723,7 @@ function DashboardPage() {
                   className={[
                     "workspace-item",
                     `workspace-tone-${index % 5}`,
+                    mainView !== "settings" &&
                     activeWorkspace?.id ===
                       workspace.id
                       ? "active"
@@ -741,284 +763,443 @@ function DashboardPage() {
           >
             +
           </button>
+          <button
+            className={[
+              "workspace-settings-button",
+              mainView === "settings" ? "active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            type="button"
+            title="Settings"
+            aria-label="Settings"
+            onClick={openSettings}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="3.1"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
+            </svg>
+          </button>
         </aside>
 
         <section className="channel-sidebar">
-          <div className="channel-sidebar-header">
-            <div className="channel-workspace-heading">
-              <span>
-                Workspace
-              </span>
-
-              <strong>
-                {activeWorkspace
-                  ? activeWorkspace.name
-                  : "No workspace"}
-              </strong>
-
-              {workspaceRole && (
-                <small>
-                  {workspaceRole}
-                </small>
-              )}
-            </div>
-
-            {activeWorkspace && (
-              <WorkspaceActionsMenu
-                key={activeWorkspace.id}
-                workspace={
-                  activeWorkspace
-                }
-                workspaceRole={
-                  workspaceRole
-                }
-                onWorkspaceUpdated={
-                  handleWorkspaceUpdated
-                }
-                onWorkspaceRemoved={
-                  handleWorkspaceRemoved
-                }
-              />
-            )}
-          </div>
-
-          {activeWorkspace && (
-            <div className="channel-sidebar-body">
-              <div className="workspace-view-navigation">
-                <button
-                  className={
-                    mainView === "chat"
-                      ? "active"
-                      : ""
-                  }
-                  type="button"
-                  onClick={() =>
-                    setMainView(
-                      "chat",
-                    )
-                  }
-                >
+          {mainView === "settings" ? (
+            <>
+              <div className="channel-sidebar-header settings-sidebar-header">
+                <div className="channel-workspace-heading">
                   <span>
-                    #
+                    CollabSpace
                   </span>
 
-                  Channels
-                </button>
+                  <strong>
+                    Settings
+                  </strong>
 
-                <button
-                  className={
-                    mainView ===
-                    "members"
-                      ? "active"
-                      : ""
-                  }
-                  type="button"
-                  onClick={() =>
-                    setMainView(
-                      "members",
-                    )
-                  }
-                >
-                  <span>
-                    M
-                  </span>
-
-                  Members
-                </button>
+                  <small>
+                    PERSONAL
+                  </small>
+                </div>
               </div>
 
-              {mainView === "chat" && (
-                <>
-                  {channelsLoading && (
-                    <div className="channel-sidebar-status">
-                      Loading channels...
+              <div className="channel-sidebar-body settings-sidebar-body">
+                <div className="settings-navigation">
+                  <span className="settings-navigation-label">
+                    Account
+                  </span>
+
+                  <button
+                    className={
+                      settingsSection ===
+                      "profile"
+                        ? "active"
+                        : ""
+                    }
+                    type="button"
+                    onClick={() =>
+                      setSettingsSection(
+                        "profile",
+                      )
+                    }
+                  >
+                    <span>
+                      P
+                    </span>
+
+                    <div>
+                      <strong>
+                        Profile
+                      </strong>
+
+                      <small>
+                        Personal information
+                      </small>
                     </div>
+                  </button>
+
+                  <button
+                    className={
+                      settingsSection ===
+                      "appearance"
+                        ? "active"
+                        : ""
+                    }
+                    type="button"
+                    onClick={() =>
+                      setSettingsSection(
+                        "appearance",
+                      )
+                    }
+                  >
+                    <span>
+                      Aa
+                    </span>
+
+                    <div>
+                      <strong>
+                        Appearance
+                      </strong>
+
+                      <small>
+                        Interface preferences
+                      </small>
+                    </div>
+                  </button>
+
+                  <span className="settings-navigation-label settings-navigation-section">
+                    Security
+                  </span>
+
+                  <button
+                    className={
+                      settingsSection ===
+                      "sign-in"
+                        ? "active"
+                        : ""
+                    }
+                    type="button"
+                    onClick={() =>
+                      setSettingsSection(
+                        "sign-in",
+                      )
+                    }
+                  >
+                    <span>
+                      S
+                    </span>
+
+                    <div>
+                      <strong>
+                        Sign-in Methods
+                      </strong>
+
+                      <small>
+                        Password and providers
+                      </small>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="settings-sidebar-note">
+                  Select a Workspace icon to return
+                  to your channels.
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="channel-sidebar-header">
+                <div className="channel-workspace-heading">
+                  <span>
+                    Workspace
+                  </span>
+
+                  <strong>
+                    {activeWorkspace
+                      ? activeWorkspace.name
+                      : "No workspace"}
+                  </strong>
+
+                  {workspaceRole && (
+                    <small>
+                      {workspaceRole}
+                    </small>
                   )}
+                </div>
 
-                  {!channelsLoading &&
-                    channelError && (
-                      <div className="channel-sidebar-error">
-                        <span>
-                          {channelError}
-                        </span>
+                {activeWorkspace && (
+                  <WorkspaceActionsMenu
+                    key={activeWorkspace.id}
+                    workspace={
+                      activeWorkspace
+                    }
+                    workspaceRole={
+                      workspaceRole
+                    }
+                    onWorkspaceUpdated={
+                      handleWorkspaceUpdated
+                    }
+                    onWorkspaceRemoved={
+                      handleWorkspaceRemoved
+                    }
+                  />
+                )}
+              </div>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            loadWorkspaceData(
-                              activeWorkspace,
-                            )
-                          }
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    )}
+              {activeWorkspace && (
+                <div className="channel-sidebar-body">
+                  <div className="workspace-view-navigation">
+                    <button
+                      className={
+                        mainView === "chat"
+                          ? "active"
+                          : ""
+                      }
+                      type="button"
+                      onClick={() =>
+                        setMainView(
+                          "chat",
+                        )
+                      }
+                    >
+                      <span>
+                        #
+                      </span>
 
-                  {!channelsLoading &&
-                    !channelError && (
-                      <>
-                        <div className="channel-section">
-                          <div className="channel-section-heading">
+                      Channels
+                    </button>
+
+                    <button
+                      className={
+                        mainView ===
+                        "members"
+                          ? "active"
+                          : ""
+                      }
+                      type="button"
+                      onClick={() =>
+                        setMainView(
+                          "members",
+                        )
+                      }
+                    >
+                      <span>
+                        M
+                      </span>
+
+                      Members
+                    </button>
+                  </div>
+
+                  {mainView === "chat" && (
+                    <>
+                      {channelsLoading && (
+                        <div className="channel-sidebar-status">
+                          Loading channels...
+                        </div>
+                      )}
+
+                      {!channelsLoading &&
+                        channelError && (
+                          <div className="channel-sidebar-error">
                             <span>
-                              Public channels
+                              {channelError}
                             </span>
 
-                            {canManageChannels && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setCreateChannelModalOpen(
-                                    true,
-                                  )
-                                }
-                              >
-                                +
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                loadWorkspaceData(
+                                  activeWorkspace,
+                                )
+                              }
+                            >
+                              Retry
+                            </button>
                           </div>
+                        )}
 
-                          <div className="channel-list">
-                            {publicChannels.map(
-                              (channel) => (
-                                <div
-                                  className="channel-list-row"
-                                  key={channel.id}
-                                >
+                      {!channelsLoading &&
+                        !channelError && (
+                          <>
+                            <div className="channel-section">
+                              <div className="channel-section-heading">
+                                <span>
+                                  Public channels
+                                </span>
+
+                                {canManageChannels && (
                                   <button
-                                    className={[
-                                      "channel-list-item",
-                                      activeChannel?.id ===
-                                      channel.id
-                                        ? "active"
-                                        : "",
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" ")}
                                     type="button"
-                                    onClick={() => {
-                                      setActiveChannel(
-                                        channel,
-                                      );
-
-                                      setMainView(
-                                        "chat",
-                                      );
-                                    }}
+                                    onClick={() =>
+                                      setCreateChannelModalOpen(
+                                        true,
+                                      )
+                                    }
                                   >
-                                    <span className="channel-symbol">
-                                      #
-                                    </span>
-
-                                    <span className="channel-name">
-                                      {channel.name}
-                                    </span>
-
-                                    {channel.is_general && (
-                                      <span className="channel-general-badge">
-                                        default
-                                      </span>
-                                    )}
+                                    +
                                   </button>
+                                )}
+                              </div>
 
-                                  <ChannelActionsMenu
-                                    channel={channel}
-                                    workspace={
-                                      activeWorkspace
-                                    }
-                                    user={user}
-                                    workspaceRole={
-                                      workspaceRole
-                                    }
-                                    onLeftChannel={
-                                      handleLeftChannel
-                                    }
-                                    onChannelUpdated={
-                                      handleChannelUpdated
-                                    }
-                                    onChannelDeleted={
-                                      handleChannelDeleted
-                                    }
-                                  />
-                                </div>
-                              ),
-                            )}
-                          </div>
-                        </div>
+                              <div className="channel-list">
+                                {publicChannels.map(
+                                  (channel) => (
+                                    <div
+                                      className="channel-list-row"
+                                      key={channel.id}
+                                    >
+                                      <button
+                                        className={[
+                                          "channel-list-item",
+                                          activeChannel?.id ===
+                                          channel.id
+                                            ? "active"
+                                            : "",
+                                        ]
+                                          .filter(Boolean)
+                                          .join(" ")}
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveChannel(
+                                            channel,
+                                          );
 
-                        <div className="channel-section">
-                          <div className="channel-section-heading">
-                            <span>
-                              Private channels
-                            </span>
-                          </div>
+                                          setMainView(
+                                            "chat",
+                                          );
+                                        }}
+                                      >
+                                        <span className="channel-symbol">
+                                          #
+                                        </span>
 
-                          <div className="channel-list">
-                            {privateChannels.map(
-                              (channel) => (
-                                <div
-                                  className="channel-list-row"
-                                  key={channel.id}
-                                >
-                                  <button
-                                    className={[
-                                      "channel-list-item",
-                                      activeChannel?.id ===
-                                      channel.id
-                                        ? "active"
-                                        : "",
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" ")}
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveChannel(
-                                        channel,
-                                      );
+                                        <span className="channel-name">
+                                          {channel.name}
+                                        </span>
 
-                                      setMainView(
-                                        "chat",
-                                      );
-                                    }}
-                                  >
-                                    <span className="channel-symbol private">
-                                      🔒
-                                    </span>
+                                        {channel.is_general && (
+                                          <span className="channel-general-badge">
+                                            default
+                                          </span>
+                                        )}
+                                      </button>
 
-                                    <span className="channel-name">
-                                      {channel.name}
-                                    </span>
-                                  </button>
+                                      <ChannelActionsMenu
+                                        channel={channel}
+                                        workspace={
+                                          activeWorkspace
+                                        }
+                                        user={user}
+                                        workspaceRole={
+                                          workspaceRole
+                                        }
+                                        onLeftChannel={
+                                          handleLeftChannel
+                                        }
+                                        onChannelUpdated={
+                                          handleChannelUpdated
+                                        }
+                                        onChannelDeleted={
+                                          handleChannelDeleted
+                                        }
+                                      />
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
 
-                                  <ChannelActionsMenu
-                                    channel={channel}
-                                    workspace={
-                                      activeWorkspace
-                                    }
-                                    user={user}
-                                    workspaceRole={
-                                      workspaceRole
-                                    }
-                                    onLeftChannel={
-                                      handleLeftChannel
-                                    }
-                                    onChannelUpdated={
-                                      handleChannelUpdated
-                                    }
-                                    onChannelDeleted={
-                                      handleChannelDeleted
-                                    }
-                                  />
-                                </div>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                </>
+                            <div className="channel-section">
+                              <div className="channel-section-heading">
+                                <span>
+                                  Private channels
+                                </span>
+                              </div>
+
+                              <div className="channel-list">
+                                {privateChannels.map(
+                                  (channel) => (
+                                    <div
+                                      className="channel-list-row"
+                                      key={channel.id}
+                                    >
+                                      <button
+                                        className={[
+                                          "channel-list-item",
+                                          activeChannel?.id ===
+                                          channel.id
+                                            ? "active"
+                                            : "",
+                                        ]
+                                          .filter(Boolean)
+                                          .join(" ")}
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveChannel(
+                                            channel,
+                                          );
+
+                                          setMainView(
+                                            "chat",
+                                          );
+                                        }}
+                                      >
+                                        <span className="channel-symbol private">
+                                          🔒
+                                        </span>
+
+                                        <span className="channel-name">
+                                          {channel.name}
+                                        </span>
+                                      </button>
+
+                                      <ChannelActionsMenu
+                                        channel={channel}
+                                        workspace={
+                                          activeWorkspace
+                                        }
+                                        user={user}
+                                        workspaceRole={
+                                          workspaceRole
+                                        }
+                                        onLeftChannel={
+                                          handleLeftChannel
+                                        }
+                                        onChannelUpdated={
+                                          handleChannelUpdated
+                                        }
+                                        onChannelDeleted={
+                                          handleChannelDeleted
+                                        }
+                                      />
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                    </>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
 
           <div className="channel-sidebar-footer">
@@ -1030,151 +1211,162 @@ function DashboardPage() {
         </section>
 
         <section className="channel-content">
-          {mainView !== "chat" && (
-            <div className="standalone-activity-controls">
-              {activityControls}
-            </div>
-          )}
-
-          {!activeWorkspace &&
-            !workspacesLoading && (
-              <div className="standalone-activity-controls">
-                {activityControls}
-              </div>
-            )}
-
-          {workspacesLoading && (
-            <div className="workspace-state">
-              <div className="state-spinner" />
-
-              <h2>
-                Loading workspaces
-              </h2>
-            </div>
-          )}
-
-          {!workspacesLoading &&
-            workspaceError && (
-              <div className="workspace-state">
-                <div className="state-icon error">
-                  !
-                </div>
-
-                <h2>
-                  Could not load workspaces
-                </h2>
-
-                <p>
-                  {workspaceError}
-                </p>
-
-                <button
-                  className="primary-button state-action"
-                  type="button"
-                  onClick={
-                    loadWorkspaces
-                  }
-                >
-                  Try again
-                </button>
-              </div>
-            )}
-
-          {!workspacesLoading &&
-            !workspaceError &&
-            workspaces.length ===
-              0 && (
-              <div className="workspace-state">
-                <div className="state-icon">
-                  W
-                </div>
-
-                <h2>
-                  No workspaces yet
-                </h2>
-
-                <p>
-                  Create a workspace or
-                  accept an invitation
-                  from the top-right
-                  invitation icon.
-                </p>
-
-                <button
-                  className="primary-button state-action"
-                  type="button"
-                  onClick={() =>
-                    setCreateWorkspaceModalOpen(
-                      true,
-                    )
-                  }
-                >
-                  Create workspace
-                </button>
-              </div>
-            )}
-
-          {mainView ===
-              "members" &&
-            activeWorkspace &&
-            workspaceRole && (
-              <WorkspaceMembersPanel
-                key={
-                  activeWorkspace.id
-                }
-                workspace={
-                  activeWorkspace
-                }
-                workspaceRole={
-                  workspaceRole
-                }
-                user={user}
-              />
-            )}
-
-          {mainView === "chat" &&
-            activeWorkspace &&
-            !channelsLoading &&
-            !channelError &&
-            !activeChannel && (
-              <div className="workspace-state">
+          {mainView === "settings" ? (
+            <SettingsContent
+              section={
+                settingsSection
+              }
+              user={user}
+            />
+          ) : (
+            <>
+              {mainView !== "chat" && (
                 <div className="standalone-activity-controls">
                   {activityControls}
                 </div>
+              )}
 
-                <div className="state-icon">
-                  #
+              {!activeWorkspace &&
+                !workspacesLoading && (
+                  <div className="standalone-activity-controls">
+                    {activityControls}
+                  </div>
+                )}
+
+              {workspacesLoading && (
+                <div className="workspace-state">
+                  <div className="state-spinner" />
+
+                  <h2>
+                    Loading workspaces
+                  </h2>
                 </div>
+              )}
 
-                <h2>
-                  No channels available
-                </h2>
-              </div>
-            )}
+              {!workspacesLoading &&
+                workspaceError && (
+                  <div className="workspace-state">
+                    <div className="state-icon error">
+                      !
+                    </div>
 
-          {mainView === "chat" &&
-            activeWorkspace &&
-            activeChannel && (
-              <ChannelAccessGate
-                key={activeChannel.id}
-                channel={
-                  activeChannel
-                }
-                workspace={
-                  activeWorkspace
-                }
-                user={user}
-                workspaceRole={
-                  workspaceRole
-                }
-                activityControls={
-                  activityControls
-                }
-                onLeftChannel={
-                  handleLeftChannel
-                }
-              />
-            )}
+                    <h2>
+                      Could not load workspaces
+                    </h2>
+
+                    <p>
+                      {workspaceError}
+                    </p>
+
+                    <button
+                      className="primary-button state-action"
+                      type="button"
+                      onClick={
+                        loadWorkspaces
+                      }
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
+
+              {!workspacesLoading &&
+                !workspaceError &&
+                workspaces.length ===
+                  0 && (
+                  <div className="workspace-state">
+                    <div className="state-icon">
+                      W
+                    </div>
+
+                    <h2>
+                      No workspaces yet
+                    </h2>
+
+                    <p>
+                      Create a workspace or
+                      accept an invitation
+                      from the top-right
+                      invitation icon.
+                    </p>
+
+                    <button
+                      className="primary-button state-action"
+                      type="button"
+                      onClick={() =>
+                        setCreateWorkspaceModalOpen(
+                          true,
+                        )
+                      }
+                    >
+                      Create workspace
+                    </button>
+                  </div>
+                )}
+
+              {mainView ===
+                  "members" &&
+                activeWorkspace &&
+                workspaceRole && (
+                  <WorkspaceMembersPanel
+                    key={
+                      activeWorkspace.id
+                    }
+                    workspace={
+                      activeWorkspace
+                    }
+                    workspaceRole={
+                      workspaceRole
+                    }
+                    user={user}
+                  />
+                )}
+
+              {mainView === "chat" &&
+                activeWorkspace &&
+                !channelsLoading &&
+                !channelError &&
+                !activeChannel && (
+                  <div className="workspace-state">
+                    <div className="standalone-activity-controls">
+                      {activityControls}
+                    </div>
+
+                    <div className="state-icon">
+                      #
+                    </div>
+
+                    <h2>
+                      No channels available
+                    </h2>
+                  </div>
+                )}
+
+              {mainView === "chat" &&
+                activeWorkspace &&
+                activeChannel && (
+                  <ChannelAccessGate
+                    key={activeChannel.id}
+                    channel={
+                      activeChannel
+                    }
+                    workspace={
+                      activeWorkspace
+                    }
+                    user={user}
+                    workspaceRole={
+                      workspaceRole
+                    }
+                    activityControls={
+                      activityControls
+                    }
+                    onLeftChannel={
+                      handleLeftChannel
+                    }
+                  />
+                )}
+            </>
+          )}
         </section>
       </main>
 
