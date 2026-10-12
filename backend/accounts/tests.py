@@ -578,3 +578,106 @@ class SetPasswordTests(APITestCase):
             "refresh",
             login_response.data,
         )
+
+
+class ChangePasswordTests(
+    APITestCase,
+):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email=("password-change@example.com"),
+            username=("password-change-user"),
+            password=("ExistingPassword123!"),
+        )
+
+        self.client.force_authenticate(
+            user=self.user,
+        )
+
+    def test_user_can_change_password(
+        self,
+    ):
+        response = self.client.post(
+            reverse(
+                "change-password",
+            ),
+            {
+                "current_password": ("ExistingPassword123!"),
+                "new_password": ("NewStrongPassword456!"),
+                "new_password_confirm": ("NewStrongPassword456!"),
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertTrue(
+            self.user.check_password(
+                "NewStrongPassword456!",
+            )
+        )
+
+    def test_change_password_rejects_wrong_current_password(
+        self,
+    ):
+        response = self.client.post(
+            reverse(
+                "change-password",
+            ),
+            {
+                "current_password": ("WrongPassword123!"),
+                "new_password": ("NewStrongPassword456!"),
+                "new_password_confirm": ("NewStrongPassword456!"),
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_change_password_rejects_mismatched_confirmation(
+        self,
+    ):
+        response = self.client.post(
+            reverse(
+                "change-password",
+            ),
+            {
+                "current_password": ("ExistingPassword123!"),
+                "new_password": ("NewStrongPassword456!"),
+                "new_password_confirm": ("DifferentPassword456!"),
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_change_password_rejects_same_password(
+        self,
+    ):
+        response = self.client.post(
+            reverse(
+                "change-password",
+            ),
+            {
+                "current_password": ("ExistingPassword123!"),
+                "new_password": ("ExistingPassword123!"),
+                "new_password_confirm": ("ExistingPassword123!"),
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )

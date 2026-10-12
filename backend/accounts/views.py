@@ -27,6 +27,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User
 from .serializers import (
     AvatarUploadSerializer,
+    ChangePasswordSerializer,
     LogoutSerializer,
     RegisterSerializer,
     SetPasswordSerializer,
@@ -398,6 +399,45 @@ class SetPasswordView(generics.GenericAPIView):
         if request.user.has_usable_password():
             return Response(
                 {"detail": ("Password sign-in is already configured.")},
+                status=(status.HTTP_400_BAD_REQUEST),
+            )
+
+        serializer = self.get_serializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        serializer.save()
+
+        return Response(
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+class ChangePasswordView(
+    generics.GenericAPIView,
+):
+    serializer_class = ChangePasswordSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    @extend_schema(
+        responses={
+            204: None,
+        },
+    )
+    def post(
+        self,
+        request,
+    ):
+        if not request.user.has_usable_password():
+            return Response(
+                {"detail": ("Password sign-in is not configured.")},
                 status=(status.HTTP_400_BAD_REQUEST),
             )
 

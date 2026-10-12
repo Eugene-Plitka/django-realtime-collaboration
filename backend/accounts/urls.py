@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import (
 
 from .views import (
     AvatarView,
+    ChangePasswordView,
     LogoutView,
     MeView,
     RegisterView,
@@ -57,6 +58,11 @@ urlpatterns = [
         "password/set/",
         SetPasswordView.as_view(),
         name="set-password",
+    ),
+    path(
+        "password/change/",
+        ChangePasswordView.as_view(),
+        name="change-password",
     ),
     path(
         "social/exchange/",

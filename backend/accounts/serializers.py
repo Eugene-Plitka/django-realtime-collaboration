@@ -210,3 +210,74 @@ class SetPasswordSerializer(serializers.Serializer):
         )
 
         return user
+
+
+class ChangePasswordSerializer(
+    serializers.Serializer,
+):
+    current_password = serializers.CharField(
+        write_only=True,
+    )
+
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[
+            validate_password,
+        ],
+    )
+
+    new_password_confirm = serializers.CharField(
+        write_only=True,
+    )
+
+    def validate(
+        self,
+        attrs,
+    ):
+        user = self.context["request"].user
+
+        if not user.check_password(
+            attrs["current_password"],
+        ):
+            raise serializers.ValidationError(
+                {"current_password": ("Current password is incorrect.")}
+            )
+
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError(
+                {"new_password_confirm": ("Passwords do not match.")}
+            )
+
+        validate_password(
+            attrs["new_password"],
+            user=user,
+        )
+
+        if user.check_password(
+            attrs["new_password"],
+        ):
+            raise serializers.ValidationError(
+                {
+                    "new_password": (
+                        "New password must be different from your current password."
+                    )
+                }
+            )
+
+        return attrs
+
+    def save(
+        self,
+        **kwargs,
+    ):
+        user = self.context["request"].user
+
+        user.set_password(self.validated_data["new_password"])
+
+        user.save(
+            update_fields=[
+                "password",
+            ],
+        )
+
+        return user

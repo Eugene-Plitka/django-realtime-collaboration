@@ -8,6 +8,7 @@ import {
   apiRequest,
   readApiError,
 } from "../api/client";
+import SignInMethodsSettings from "./SignInMethodsSettings";
 
 
 const AVATAR_COLORS = [
@@ -713,7 +714,7 @@ function SettingsContent({
     section === "sign-in"
   ) {
     return (
-      <SignInSettings />
+      <SignInMethodsSettings />
     );
   }
 
