@@ -376,6 +376,104 @@ class DirectConversationAPITests(
             "Hello member",
         )
 
+    def test_new_direct_message_increments_unread_count_for_other_participant(
+        self,
+    ):
+        conversation = DirectConversation.objects.create(
+            type=DirectConversation.Type.DIRECT,
+            direct_key=(
+                f"{min(self.owner.id, self.member.id)}:"
+                f"{max(self.owner.id, self.member.id)}"
+            ),
+            created_by=self.owner,
+        )
+
+        owner_participant = DirectConversationParticipant.objects.create(
+            conversation=conversation,
+            user=self.owner,
+        )
+
+        member_participant = DirectConversationParticipant.objects.create(
+            conversation=conversation,
+            user=self.member,
+        )
+
+        from .services import (
+            create_direct_message,
+        )
+
+        create_direct_message(
+            conversation=conversation,
+            author=self.owner,
+            text="Unread message",
+        )
+
+        owner_participant.refresh_from_db()
+        member_participant.refresh_from_db()
+
+        self.assertEqual(
+            owner_participant.unread_count,
+            0,
+        )
+
+        self.assertEqual(
+            member_participant.unread_count,
+            1,
+        )
+
+    def test_mark_direct_conversation_read_resets_unread_count(
+        self,
+    ):
+        conversation = DirectConversation.objects.create(
+            type=DirectConversation.Type.DIRECT,
+            direct_key=(
+                f"{min(self.owner.id, self.member.id)}:"
+                f"{max(self.owner.id, self.member.id)}"
+            ),
+            created_by=self.owner,
+        )
+
+        DirectConversationParticipant.objects.create(
+            conversation=conversation,
+            user=self.owner,
+        )
+
+        member_participant = DirectConversationParticipant.objects.create(
+            conversation=conversation,
+            user=self.member,
+            unread_count=3,
+        )
+
+        self.client.force_authenticate(
+            user=self.member,
+        )
+
+        response = self.client.post(
+            reverse(
+                "direct-conversation-mark-read",
+                kwargs={
+                    "conversation_id": conversation.id,
+                },
+            ),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        member_participant.refresh_from_db()
+
+        self.assertEqual(
+            member_participant.unread_count,
+            0,
+        )
+
+        self.assertEqual(
+            response.data["unread_count"],
+            0,
+        )
+
 
 @database_sync_to_async
 def create_direct_test_message(

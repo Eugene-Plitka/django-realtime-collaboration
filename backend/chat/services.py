@@ -2,6 +2,7 @@ import logging
 import re
 
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from notifications.models import Notification
@@ -491,6 +492,14 @@ def create_direct_message(
         text=text,
     )
 
+    DirectConversationParticipant.objects.filter(
+        conversation=conversation,
+    ).exclude(
+        user=author,
+    ).update(
+        unread_count=F("unread_count") + 1,
+    )
+
     conversation.updated_at = timezone.now()
 
     conversation.save(
@@ -580,3 +589,31 @@ def delete_direct_message(
     )
 
     return message
+
+
+@transaction.atomic
+def mark_direct_conversation_read(
+    *,
+    conversation,
+    user,
+):
+    try:
+        participant = DirectConversationParticipant.objects.select_for_update().get(
+            conversation=conversation,
+            user=user,
+        )
+    except DirectConversationParticipant.DoesNotExist:
+        raise ValueError("User is not a conversation participant.")
+
+    if participant.unread_count == 0:
+        return participant
+
+    participant.unread_count = 0
+
+    participant.save(
+        update_fields=[
+            "unread_count",
+        ],
+    )
+
+    return participant

@@ -1,3 +1,6 @@
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 from accounts.models import User
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
@@ -53,6 +56,7 @@ from .services import (
     delete_channel,
     join_channel,
     leave_channel,
+    mark_direct_conversation_read,
     remove_channel_member,
 )
 
@@ -696,6 +700,84 @@ class DirectConversationDetailView(
                 "participants__user",
             )
             .distinct()
+        )
+
+
+class DirectConversationMarkReadView(
+    generics.GenericAPIView,
+):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: DirectConversationSerializer,
+        },
+    )
+    def post(
+        self,
+        request,
+        conversation_id,
+    ):
+        try:
+            conversation = DirectConversation.objects.prefetch_related(
+                "participants__user",
+            ).get(
+                pk=conversation_id,
+                participants__user=request.user,
+            )
+        except DirectConversation.DoesNotExist:
+            raise NotFound()
+
+        try:
+            mark_direct_conversation_read(
+                conversation=conversation,
+                user=request.user,
+            )
+        except ValueError:
+            raise NotFound()
+
+        conversation = (
+            DirectConversation.objects.select_related(
+                "created_by",
+            )
+            .prefetch_related(
+                "participants__user",
+            )
+            .get(
+                pk=conversation.id,
+            )
+        )
+
+        serializer = DirectConversationSerializer(
+            conversation,
+            context={
+                "request": request,
+            },
+        )
+
+        response_data = dict(
+            serializer.data,
+        )
+
+        channel_layer = get_channel_layer()
+
+        async_to_sync(
+            channel_layer.group_send,
+        )(
+            f"user_{request.user.id}",
+            {
+                "type": "direct_message.unread_updated",
+                "data": {
+                    "conversation": response_data,
+                },
+            },
+        )
+
+        return Response(
+            response_data,
         )
 
 

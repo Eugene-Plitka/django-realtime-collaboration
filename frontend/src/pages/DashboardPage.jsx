@@ -23,6 +23,7 @@ import SettingsContent from "../components/SettingsContent";
 import UserAvatar from "../components/UserAvatar";
 import WorkspaceActionsMenu from "../components/WorkspaceActionsMenu";
 import WorkspaceMembersPanel from "../components/WorkspaceMembersPanel";
+import { useDirectMessageUpdates } from "../directMessages/useDirectMessageUpdates";
 import { useNotifications } from "../notifications/useNotifications";
 
 
@@ -111,6 +112,7 @@ function DashboardPage() {
     markRead,
     markUnread,
   } = useNotifications();
+
   const [workspaces, setWorkspaces] =
     useState([]);
   const [
@@ -209,6 +211,81 @@ function DashboardPage() {
             (conversation.unread_count ?? 0) > 0,
         ).length,
       [directConversations],
+    );
+
+  const mergeDirectConversation =
+    useCallback(
+      (incomingConversation) => {
+        if (!incomingConversation) {
+          return;
+        }
+
+        setDirectConversations(
+          (currentConversations) =>
+            [
+              incomingConversation,
+              ...currentConversations.filter(
+                (conversation) =>
+                  conversation.id !==
+                  incomingConversation.id,
+              ),
+            ].sort(
+              (first, second) =>
+                new Date(
+                  second.updated_at,
+                ) -
+                new Date(
+                  first.updated_at,
+                ),
+            ),
+        );
+
+        setActiveDirectConversation(
+          (currentConversation) =>
+            currentConversation?.id ===
+            incomingConversation.id
+              ? incomingConversation
+              : currentConversation,
+        );
+      },
+      [],
+    );
+
+  useDirectMessageUpdates({
+    onConversationUpdate:
+      mergeDirectConversation,
+  });
+
+  const markDirectConversationRead =
+    useCallback(
+      async (conversationId) => {
+        const response =
+          await apiRequest(
+            `/api/direct-conversations/${conversationId}/read/`,
+            {
+              method: "POST",
+            },
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            await readApiError(
+              response,
+              "Unable to mark direct messages as read.",
+            ),
+          );
+        }
+
+        const updatedConversation =
+          await response.json();
+
+        mergeDirectConversation(
+          updatedConversation,
+        );
+
+        return updatedConversation;
+      },
+      [mergeDirectConversation],
     );
 
   const loadDirectConversations =
@@ -443,6 +520,28 @@ function DashboardPage() {
   }, [
     loadWorkspaces,
     loadDirectConversations,
+  ]);
+
+  useEffect(() => {
+    if (
+      mainView !== "direct" ||
+      !activeDirectConversation ||
+      (activeDirectConversation.unread_count ?? 0) === 0
+    ) {
+      return;
+    }
+
+    markDirectConversationRead(
+      activeDirectConversation.id,
+    ).catch((requestError) => {
+      setDirectConversationsError(
+        requestError.message,
+      );
+    });
+  }, [
+    mainView,
+    activeDirectConversation,
+    markDirectConversationRead,
   ]);
 
   useEffect(() => {

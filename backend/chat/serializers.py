@@ -376,6 +376,8 @@ class DirectConversationSerializer(
         read_only=True,
     )
 
+    unread_count = serializers.SerializerMethodField()
+
     class Meta:
         model = DirectConversation
 
@@ -385,11 +387,39 @@ class DirectConversationSerializer(
             "name",
             "created_by",
             "participants",
+            "unread_count",
             "created_at",
             "updated_at",
         )
 
         read_only_fields = fields
+
+    def get_unread_count(
+        self,
+        conversation,
+    ) -> int:
+        request = self.context.get(
+            "request",
+        )
+
+        if request is None or not request.user.is_authenticated:
+            return 0
+
+        current_user_id = request.user.id
+
+        participant = next(
+            (
+                item
+                for item in conversation.participants.all()
+                if item.user_id == current_user_id
+            ),
+            None,
+        )
+
+        if participant is None:
+            return 0
+
+        return participant.unread_count
 
 
 class DirectConversationUserSerializer(

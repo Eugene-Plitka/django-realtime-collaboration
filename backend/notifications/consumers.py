@@ -1,12 +1,16 @@
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
 
-class NotificationConsumer(AsyncJsonWebsocketConsumer):
+class NotificationConsumer(
+    AsyncJsonWebsocketConsumer,
+):
     async def connect(self):
         user = self.scope["user"]
 
         if not user.is_authenticated:
-            await self.close(code=4401)
+            await self.close(
+                code=4401,
+            )
             return
 
         self.group_name = f"user_{user.id}"
@@ -16,19 +20,43 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             self.channel_name,
         )
 
-        await self.accept(subprotocol=self.scope.get("jwt_subprotocol"))
+        await self.accept(
+            subprotocol=self.scope.get(
+                "jwt_subprotocol",
+            ),
+        )
 
-    async def disconnect(self, close_code):
-        if hasattr(self, "group_name"):
+    async def disconnect(
+        self,
+        close_code,
+    ):
+        if hasattr(
+            self,
+            "group_name",
+        ):
             await self.channel_layer.group_discard(
                 self.group_name,
                 self.channel_name,
             )
 
-    async def notification_created(self, event):
+    async def notification_created(
+        self,
+        event,
+    ):
         await self.send_json(
             {
                 "type": "notification.created",
+                "data": event["data"],
+            }
+        )
+
+    async def direct_message_unread_updated(
+        self,
+        event,
+    ):
+        await self.send_json(
+            {
+                "type": "direct_message.unread_updated",
                 "data": event["data"],
             }
         )

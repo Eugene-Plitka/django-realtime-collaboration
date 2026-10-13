@@ -948,6 +948,62 @@ def direct_message_to_data(
 
 
 @database_sync_to_async
+def get_direct_conversation_updates(
+    *,
+    conversation_id,
+):
+    conversation = (
+        DirectConversation.objects.select_related(
+            "created_by",
+        )
+        .prefetch_related(
+            "participants__user",
+        )
+        .get(
+            pk=conversation_id,
+        )
+    )
+
+    participants = list(conversation.participants.all())
+
+    participant_data = [
+        {
+            "id": participant.id,
+            "user_id": participant.user_id,
+            "username": participant.user.username,
+            "email": participant.user.email,
+            "status": participant.user.status,
+            "avatar_url": get_user_avatar_url(
+                participant.user,
+            ),
+            "joined_at": participant.joined_at.isoformat(),
+        }
+        for participant in participants
+    ]
+
+    updates = []
+
+    for participant in participants:
+        updates.append(
+            {
+                "user_id": participant.user_id,
+                "conversation": {
+                    "id": conversation.id,
+                    "type": conversation.type,
+                    "name": conversation.name,
+                    "created_by": conversation.created_by_id,
+                    "participants": participant_data,
+                    "unread_count": participant.unread_count,
+                    "created_at": conversation.created_at.isoformat(),
+                    "updated_at": conversation.updated_at.isoformat(),
+                },
+            }
+        )
+
+    return updates
+
+
+@database_sync_to_async
 def user_has_direct_conversation_access(
     *,
     conversation_id,
@@ -1369,6 +1425,21 @@ class DirectConversationConsumer(
                 "data": message_data,
             },
         )
+
+        updates = await get_direct_conversation_updates(
+            conversation_id=self.conversation_id,
+        )
+
+        for update in updates:
+            await self.channel_layer.group_send(
+                f"user_{update['user_id']}",
+                {
+                    "type": "direct_message.unread_updated",
+                    "data": {
+                        "conversation": update["conversation"],
+                    },
+                },
+            )
 
     async def direct_message_created(
         self,

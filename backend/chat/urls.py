@@ -9,6 +9,7 @@ from .views import (
     ChannelMemberRemoveView,
     DirectConversationDetailView,
     DirectConversationListCreateView,
+    DirectConversationMarkReadView,
     DirectConversationParticipantListView,
     DirectMessageListView,
     MessageListView,
@@ -65,6 +66,11 @@ urlpatterns = [
         "direct-conversations/<int:pk>/",
         DirectConversationDetailView.as_view(),
         name="direct-conversation-detail",
+    ),
+    path(
+        "direct-conversations/<int:conversation_id>/read/",
+        DirectConversationMarkReadView.as_view(),
+        name="direct-conversation-mark-read",
     ),
     path(
         "direct-conversations/<int:conversation_id>/messages/",

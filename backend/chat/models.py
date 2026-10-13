@@ -269,6 +269,10 @@ class DirectConversationParticipant(
         related_name="direct_conversation_participations",
     )
 
+    unread_count = models.PositiveIntegerField(
+        default=0,
+    )
+
     joined_at = models.DateTimeField(
         auto_now_add=True,
     )
