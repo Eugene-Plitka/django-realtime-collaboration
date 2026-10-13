@@ -41,6 +41,7 @@ from .serializers import (
     ChannelSerializer,
     DirectConversationCreateSerializer,
     DirectConversationSerializer,
+    DirectConversationUserSerializer,
     DirectMessageSerializer,
     MessageSerializer,
 )
@@ -512,30 +513,38 @@ class MessageListView(generics.ListAPIView):
         )
 
 
+class DirectConversationParticipantListView(
+    generics.ListAPIView,
+):
+    serializer_class = DirectConversationUserSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            User.objects.filter(
+                workspace_memberships__workspace__memberships__user=self.request.user,
+            )
+            .exclude(
+                pk=self.request.user.id,
+            )
+            .distinct()
+            .order_by(
+                "username",
+            )
+        )
+
+
 class DirectConversationListCreateView(
     generics.GenericAPIView,
 ):
     permission_classes = [
         IsAuthenticated,
     ]
-
-    def get_workspace(self):
-        try:
-            workspace = Workspace.objects.get(
-                pk=self.kwargs["workspace_id"],
-            )
-        except Workspace.DoesNotExist:
-            raise NotFound()
-
-        membership = get_workspace_membership(
-            workspace=workspace,
-            user=self.request.user,
-        )
-
-        if membership is None:
-            raise NotFound()
-
-        return workspace
 
     @extend_schema(
         responses={
@@ -547,17 +556,12 @@ class DirectConversationListCreateView(
     def get(
         self,
         request,
-        workspace_id,
     ):
-        workspace = self.get_workspace()
-
         conversations = (
             DirectConversation.objects.filter(
-                workspace=workspace,
                 participants__user=request.user,
             )
             .select_related(
-                "workspace",
                 "created_by",
             )
             .prefetch_related(
@@ -591,10 +595,7 @@ class DirectConversationListCreateView(
     def post(
         self,
         request,
-        workspace_id,
     ):
-        workspace = self.get_workspace()
-
         serializer = DirectConversationCreateSerializer(
             data=request.data,
         )
@@ -626,7 +627,6 @@ class DirectConversationListCreateView(
                     conversation,
                     created,
                 ) = create_direct_conversation(
-                    workspace=workspace,
                     created_by=request.user,
                     participant_users=participant_users,
                 )
@@ -636,7 +636,6 @@ class DirectConversationListCreateView(
                 )
             else:
                 conversation = create_group_conversation(
-                    workspace=workspace,
                     created_by=request.user,
                     participant_users=participant_users,
                     name=serializer.validated_data["name"],
@@ -653,7 +652,6 @@ class DirectConversationListCreateView(
 
         conversation = (
             DirectConversation.objects.select_related(
-                "workspace",
                 "created_by",
             )
             .prefetch_related(
@@ -692,7 +690,6 @@ class DirectConversationDetailView(
                 participants__user=self.request.user,
             )
             .select_related(
-                "workspace",
                 "created_by",
             )
             .prefetch_related(

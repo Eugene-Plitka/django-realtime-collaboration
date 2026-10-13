@@ -10074,3 +10074,14 @@ p {
   line-height: 20px;
   text-align: center;
 }
+
+.channel-create-icon {
+  padding: 0;
+  line-height: 0;
+}
+
+.channel-create-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}

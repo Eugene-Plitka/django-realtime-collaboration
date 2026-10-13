@@ -213,25 +213,20 @@ function DashboardPage() {
 
   const loadDirectConversations =
     useCallback(
-      async (workspace) => {
-        if (!workspace) {
-          setDirectConversations([]);
-          setActiveDirectConversation(
-            null,
-          );
-          return;
-        }
+      async () => {
         setDirectConversationsLoading(
           true,
         );
         setDirectConversationsError(
           "",
         );
+
         try {
           const response =
             await apiRequest(
-              `/api/workspaces/${workspace.id}/direct-conversations/`,
+              "/api/direct-conversations/",
             );
+
           if (!response.ok) {
             throw new Error(
               await readApiError(
@@ -240,11 +235,14 @@ function DashboardPage() {
               ),
             );
           }
+
           const data =
             await response.json();
+
           setDirectConversations(
             data,
           );
+
           setActiveDirectConversation(
             (
               currentConversation,
@@ -263,6 +261,7 @@ function DashboardPage() {
                     currentConversation.id,
                 );
               }
+
               return null;
             },
           );
@@ -440,23 +439,21 @@ function DashboardPage() {
 
   useEffect(() => {
     loadWorkspaces();
-  }, [loadWorkspaces]);
+    loadDirectConversations();
+  }, [
+    loadWorkspaces,
+    loadDirectConversations,
+  ]);
 
   useEffect(() => {
     setActiveChannel(null);
-    setActiveDirectConversation(
-      null,
-    );
+
     loadWorkspaceData(
-      activeWorkspace,
-    );
-    loadDirectConversations(
       activeWorkspace,
     );
   }, [
     activeWorkspace,
     loadWorkspaceData,
-    loadDirectConversations,
   ]);
 
   useEffect(() => {
@@ -1103,11 +1100,6 @@ function DashboardPage() {
                     Direct Messages
                   </strong>
 
-                  <small>
-                    {activeWorkspace
-                      ? activeWorkspace.name
-                      : "Workspace"}
-                  </small>
                 </div>
 
                 <button
@@ -1121,7 +1113,18 @@ function DashboardPage() {
                     )
                   }
                 >
-                  +
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M12 5v14M5 12h14"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
               </div>
 
@@ -1142,9 +1145,7 @@ function DashboardPage() {
                       <button
                         type="button"
                         onClick={() =>
-                          loadDirectConversations(
-                            activeWorkspace,
-                          )
+                          loadDirectConversations()
                         }
                       >
                         Retry
@@ -1611,13 +1612,15 @@ function DashboardPage() {
                   {activityControls}
                 </div>
               )}
-              {!activeWorkspace &&
+              {mainView !== "direct" &&
+                !activeWorkspace &&
                 !workspacesLoading && (
                   <div className="standalone-activity-controls">
                     {activityControls}
                   </div>
                 )}
-              {workspacesLoading && (
+              {mainView !== "direct" &&
+                workspacesLoading && (
                 <div className="workspace-state">
                   <div className="state-spinner" />
                   <h2>
@@ -1625,7 +1628,8 @@ function DashboardPage() {
                   </h2>
                 </div>
               )}
-              {!workspacesLoading &&
+              {mainView !== "direct" &&
+                !workspacesLoading &&
                 workspaceError && (
                   <div className="workspace-state">
                     <div className="state-icon error">
@@ -1648,7 +1652,8 @@ function DashboardPage() {
                     </button>
                   </div>
                 )}
-              {!workspacesLoading &&
+              {mainView !== "direct" &&
+                !workspacesLoading &&
                 !workspaceError &&
                 workspaces.length ===
                   0 && (
@@ -1696,7 +1701,6 @@ function DashboardPage() {
                   />
                 )}
               {mainView === "direct" &&
-                activeWorkspace &&
                 activeDirectConversation && (
                   <DirectConversationPreview
                     key={
@@ -1789,9 +1793,6 @@ function DashboardPage() {
       <CreateDirectConversationModal
         open={
           createDirectConversationModalOpen
-        }
-        workspace={
-          activeWorkspace
         }
         user={user}
         onClose={() =>

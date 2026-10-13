@@ -6,6 +6,7 @@ from rest_framework import serializers
 from accounts.avatar_utils import (
     get_user_avatar_url,
 )
+from accounts.models import User
 
 from .models import (
     Channel,
@@ -380,7 +381,6 @@ class DirectConversationSerializer(
 
         fields = (
             "id",
-            "workspace",
             "type",
             "name",
             "created_by",
@@ -390,6 +390,41 @@ class DirectConversationSerializer(
         )
 
         read_only_fields = fields
+
+
+class DirectConversationUserSerializer(
+    serializers.ModelSerializer,
+):
+    user_id = serializers.IntegerField(
+        source="id",
+        read_only=True,
+    )
+
+    avatar_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+
+        fields = (
+            "user_id",
+            "username",
+            "email",
+            "status",
+            "avatar_url",
+        )
+
+        read_only_fields = fields
+
+    def get_avatar_url(
+        self,
+        user,
+    ) -> str | None:
+        return get_user_avatar_url(
+            user,
+            request=self.context.get(
+                "request",
+            ),
+        )
 
 
 class DirectConversationCreateSerializer(

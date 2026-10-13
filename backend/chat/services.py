@@ -335,10 +335,28 @@ def build_direct_conversation_key(
     return f"{first_id}:{second_id}"
 
 
+def get_available_direct_user_ids(
+    *,
+    user,
+):
+    return set(
+        WorkspaceMembership.objects.filter(
+            workspace__memberships__user=user,
+        )
+        .exclude(
+            user=user,
+        )
+        .values_list(
+            "user_id",
+            flat=True,
+        )
+        .distinct()
+    )
+
+
 @transaction.atomic
 def create_direct_conversation(
     *,
-    workspace,
     created_by,
     participant_users,
 ):
@@ -351,22 +369,16 @@ def create_direct_conversation(
     if len(users) != 2:
         raise ValueError("A direct conversation must contain exactly two participants.")
 
-    user_ids = [user.id for user in users]
+    other_user = next(user for user in users if user.id != created_by.id)
 
-    workspace_user_ids = set(
-        WorkspaceMembership.objects.filter(
-            workspace=workspace,
-            user_id__in=user_ids,
-        ).values_list(
-            "user_id",
-            flat=True,
-        )
+    available_user_ids = get_available_direct_user_ids(
+        user=created_by,
     )
 
-    if workspace_user_ids != set(user_ids):
-        raise ValueError("All participants must be members of this workspace.")
-
-    other_user = next(user for user in users if user.id != created_by.id)
+    if other_user.id not in available_user_ids:
+        raise ValueError(
+            "You can only start a conversation with a user from one of your workspaces."
+        )
 
     direct_key = build_direct_conversation_key(
         first_user_id=created_by.id,
@@ -374,7 +386,6 @@ def create_direct_conversation(
     )
 
     conversation, created = DirectConversation.objects.get_or_create(
-        workspace=workspace,
         direct_key=direct_key,
         defaults={
             "type": DirectConversation.Type.DIRECT,
@@ -402,7 +413,6 @@ def create_direct_conversation(
 @transaction.atomic
 def create_group_conversation(
     *,
-    workspace,
     created_by,
     participant_users,
     name="",
@@ -418,23 +428,20 @@ def create_group_conversation(
             "A group conversation must contain at least three participants."
         )
 
-    user_ids = [user.id for user in users]
+    participant_user_ids = {user.id for user in users if user.id != created_by.id}
 
-    workspace_user_ids = set(
-        WorkspaceMembership.objects.filter(
-            workspace=workspace,
-            user_id__in=user_ids,
-        ).values_list(
-            "user_id",
-            flat=True,
-        )
+    available_user_ids = get_available_direct_user_ids(
+        user=created_by,
     )
 
-    if workspace_user_ids != set(user_ids):
-        raise ValueError("All participants must be members of this workspace.")
+    if not participant_user_ids.issubset(
+        available_user_ids,
+    ):
+        raise ValueError(
+            "Every participant must be a user from one of your workspaces."
+        )
 
     conversation = DirectConversation.objects.create(
-        workspace=workspace,
         type=DirectConversation.Type.GROUP,
         name=name.strip(),
         direct_key=None,

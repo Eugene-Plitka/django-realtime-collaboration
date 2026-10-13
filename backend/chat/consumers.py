@@ -959,7 +959,6 @@ def user_has_direct_conversation_access(
     return DirectConversationParticipant.objects.filter(
         conversation_id=conversation_id,
         user=user,
-        conversation__workspace__memberships__user=user,
     ).exists()
 
 

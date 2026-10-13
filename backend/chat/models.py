@@ -182,12 +182,6 @@ class DirectConversation(models.Model):
         DIRECT = "DIRECT", "Direct"
         GROUP = "GROUP", "Group"
 
-    workspace = models.ForeignKey(
-        Workspace,
-        on_delete=models.CASCADE,
-        related_name="direct_conversations",
-    )
-
     type = models.CharField(
         max_length=10,
         choices=Type.choices,
@@ -222,7 +216,6 @@ class DirectConversation(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "workspace",
                     "direct_key",
                 ],
                 condition=Q(
@@ -248,10 +241,9 @@ class DirectConversation(models.Model):
         indexes = [
             models.Index(
                 fields=[
-                    "workspace",
                     "-updated_at",
                 ],
-                name="dm_workspace_updated_idx",
+                name="dm_updated_idx",
             ),
         ]
 

@@ -98,6 +98,10 @@ SPECTACULAR_SETTINGS = {
         "ChannelTypeEnum": ("chat.models.Channel.Type"),
         "DirectConversationTypeEnum": ("chat.models.DirectConversation.Type"),
         "NotificationTypeEnum": ("notifications.models.Notification.Type"),
+        "UserStatusEnum": ("accounts.models.User.Status"),
+        "WorkspaceInvitationStatusEnum": (
+            "workspaces.models.WorkspaceInvitation.Status"
+        ),
     },
 }
 

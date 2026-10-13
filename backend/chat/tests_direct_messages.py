@@ -78,9 +78,6 @@ class DirectConversationAPITests(
         response = self.client.post(
             reverse(
                 "direct-conversation-list-create",
-                kwargs={
-                    "workspace_id": self.workspace.id,
-                },
             ),
             {
                 "type": DirectConversation.Type.DIRECT,
@@ -127,9 +124,6 @@ class DirectConversationAPITests(
     ):
         url = reverse(
             "direct-conversation-list-create",
-            kwargs={
-                "workspace_id": self.workspace.id,
-            },
         )
 
         first_response = self.client.post(
@@ -175,7 +169,6 @@ class DirectConversationAPITests(
 
         self.assertEqual(
             DirectConversation.objects.filter(
-                workspace=self.workspace,
                 type=DirectConversation.Type.DIRECT,
             ).count(),
             1,
@@ -187,9 +180,6 @@ class DirectConversationAPITests(
         response = self.client.post(
             reverse(
                 "direct-conversation-list-create",
-                kwargs={
-                    "workspace_id": self.workspace.id,
-                },
             ),
             {
                 "type": DirectConversation.Type.GROUP,
@@ -212,9 +202,6 @@ class DirectConversationAPITests(
         response = self.client.post(
             reverse(
                 "direct-conversation-list-create",
-                kwargs={
-                    "workspace_id": self.workspace.id,
-                },
             ),
             {
                 "type": DirectConversation.Type.GROUP,
@@ -248,9 +235,6 @@ class DirectConversationAPITests(
         response = self.client.post(
             reverse(
                 "direct-conversation-list-create",
-                kwargs={
-                    "workspace_id": self.workspace.id,
-                },
             ),
             {
                 "type": DirectConversation.Type.DIRECT,
@@ -270,7 +254,6 @@ class DirectConversationAPITests(
         self,
     ):
         conversation = DirectConversation.objects.create(
-            workspace=self.workspace,
             type=DirectConversation.Type.GROUP,
             name="Private group",
             created_by=self.member,
@@ -293,9 +276,6 @@ class DirectConversationAPITests(
         response = self.client.get(
             reverse(
                 "direct-conversation-list-create",
-                kwargs={
-                    "workspace_id": self.workspace.id,
-                },
             )
         )
 
@@ -315,7 +295,6 @@ class DirectConversationAPITests(
         self,
     ):
         conversation = DirectConversation.objects.create(
-            workspace=self.workspace,
             type=DirectConversation.Type.GROUP,
             name="Members only",
             created_by=self.member,
@@ -349,7 +328,6 @@ class DirectConversationAPITests(
         self,
     ):
         conversation = DirectConversation.objects.create(
-            workspace=self.workspace,
             type=DirectConversation.Type.DIRECT,
             direct_key=(
                 f"{min(self.owner.id, self.member.id)}:"
@@ -488,7 +466,6 @@ class DirectConversationWebSocketTests(
         )
 
         self.conversation = DirectConversation.objects.create(
-            workspace=self.workspace,
             type=DirectConversation.Type.GROUP,
             name="WebSocket DM group",
             created_by=self.owner,

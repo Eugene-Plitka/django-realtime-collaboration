@@ -14,49 +14,34 @@ import UserAvatar from "./UserAvatar";
 
 function CreateDirectConversationModal({
   open,
-  workspace,
   user,
   onClose,
   onCreated,
 }) {
-  const [
-    members,
-    setMembers,
-  ] = useState([]);
+  const [members, setMembers] =
+    useState([]);
 
-  const [
-    type,
-    setType,
-  ] = useState("DIRECT");
+  const [type, setType] =
+    useState("DIRECT");
 
-  const [
-    selectedIds,
-    setSelectedIds,
-  ] = useState([]);
+  const [selectedIds, setSelectedIds] =
+    useState([]);
 
-  const [
-    name,
-    setName,
-  ] = useState("");
+  const [name, setName] =
+    useState("");
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
-  const [
-    submitting,
-    setSubmitting,
-  ] = useState(false);
+  const [submitting, setSubmitting] =
+    useState(false);
 
-  const [
-    error,
-    setError,
-  ] = useState("");
+  const [error, setError] =
+    useState("");
 
 
   useEffect(() => {
-    if (!open || !workspace) {
+    if (!open) {
       setMembers([]);
       setSelectedIds([]);
       setType("DIRECT");
@@ -77,14 +62,14 @@ function CreateDirectConversationModal({
       try {
         const response =
           await apiRequest(
-            `/api/workspaces/${workspace.id}/members/`,
+            "/api/direct-conversations/participants/",
           );
 
         if (!response.ok) {
           throw new Error(
             await readApiError(
               response,
-              "Unable to load workspace members.",
+              "Unable to load available members.",
             ),
           );
         }
@@ -123,7 +108,6 @@ function CreateDirectConversationModal({
     };
   }, [
     open,
-    workspace,
     user.id,
   ]);
 
@@ -144,7 +128,7 @@ function CreateDirectConversationModal({
     );
 
 
-  if (!open || !workspace) {
+  if (!open) {
     return null;
   }
 
@@ -227,7 +211,7 @@ function CreateDirectConversationModal({
     try {
       const response =
         await apiRequest(
-          `/api/workspaces/${workspace.id}/direct-conversations/`,
+          "/api/direct-conversations/",
           {
             method: "POST",
             body: {
@@ -291,7 +275,7 @@ function CreateDirectConversationModal({
         <div className="workspace-modal-header">
           <div>
             <span className="workspace-modal-eyebrow">
-              {workspace.name}
+              Messages
             </span>
 
             <h2 id="create-direct-conversation-title">
@@ -299,8 +283,8 @@ function CreateDirectConversationModal({
             </h2>
 
             <p>
-              Start a private conversation with one
-              or more workspace members.
+              Start a private conversation with people
+              from your workspaces.
             </p>
           </div>
 
@@ -399,7 +383,7 @@ function CreateDirectConversationModal({
             {!loading &&
               members.length === 0 && (
                 <div className="dm-member-picker-state">
-                  No other workspace members.
+                  No available members.
                 </div>
               )}
 
