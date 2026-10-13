@@ -10,6 +10,7 @@ import {
 
 import { useAuth } from "../auth/AuthContext";
 import AuthShell from "../components/AuthShell";
+import PasswordField from "../components/PasswordField";
 
 
 function RegisterPage() {
@@ -128,8 +129,7 @@ function RegisterPage() {
             Password
           </span>
 
-          <input
-            type="password"
+          <PasswordField
             value={password}
             onChange={(event) =>
               setPassword(
@@ -139,6 +139,7 @@ function RegisterPage() {
             placeholder="Create a strong password"
             autoComplete="new-password"
             required
+            ariaLabel="Password"
           />
         </label>
 

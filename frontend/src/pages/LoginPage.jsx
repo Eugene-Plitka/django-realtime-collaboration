@@ -14,6 +14,7 @@ import {
 } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import AuthShell from "../components/AuthShell";
+import PasswordField from "../components/PasswordField";
 
 
 function GoogleIcon() {
@@ -223,8 +224,7 @@ function LoginPage() {
             Password
           </span>
 
-          <input
-            type="password"
+          <PasswordField
             value={password}
             onChange={(event) =>
               setPassword(
@@ -234,6 +234,7 @@ function LoginPage() {
             placeholder="Enter your password"
             autoComplete="current-password"
             required
+            ariaLabel="Password"
           />
         </label>
 
