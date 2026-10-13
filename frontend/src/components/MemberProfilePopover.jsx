@@ -1,3 +1,4 @@
+import PresenceStatusDot from "./PresenceStatusDot";
 import UserAvatar from "./UserAvatar";
 
 
@@ -39,15 +40,27 @@ function MemberProfilePopover({
 
         <div className="member-profile-banner" />
 
-        <UserAvatar
-          className="member-profile-avatar"
-          username={
-            member.username
-          }
-          avatarUrl={
-            member.avatar_url
-          }
-        />
+        <div className="presence-avatar-shell member-profile-avatar-shell">
+          <UserAvatar
+            className="member-profile-avatar"
+            username={
+              member.username
+            }
+            avatarUrl={
+              member.avatar_url
+            }
+          />
+
+          <PresenceStatusDot
+            className="member-profile-presence-dot"
+            userId={
+              member.user_id
+            }
+            status={
+              member.status
+            }
+          />
+        </div>
 
         <div className="member-profile-content">
           <h2>

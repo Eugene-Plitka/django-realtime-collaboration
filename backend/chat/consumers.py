@@ -46,6 +46,7 @@ def reply_to_data(
         "author_avatar_url": get_user_avatar_url(
             reply_to.author,
         ),
+        "author_status": reply_to.author.status,
         "text": (None if reply_to.is_deleted else reply_to.text),
         "is_deleted": reply_to.is_deleted,
     }
@@ -62,6 +63,7 @@ def message_to_data(
         "author_avatar_url": get_user_avatar_url(
             message.author,
         ),
+        "author_status": message.author.status,
         "reply_to": message.reply_to_id,
         "reply_to_message": reply_to_data(
             message,

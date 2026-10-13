@@ -1,19 +1,34 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import {
+  StrictMode,
+} from "react";
+import {
+  createRoot,
+} from "react-dom/client";
+import {
+  BrowserRouter,
+} from "react-router-dom";
 
 import App from "./App";
-import { AuthProvider } from "./auth/AuthContext";
+import {
+  AuthProvider,
+} from "./auth/AuthContext";
 import "./index.css";
+import {
+  PresenceProvider,
+} from "./presence/PresenceContext";
 
 
 createRoot(
-  document.getElementById("root"),
+  document.getElementById(
+    "root",
+  ),
 ).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <PresenceProvider>
+          <App />
+        </PresenceProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

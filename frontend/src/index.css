@@ -4646,15 +4646,25 @@ button.cancel:hover {
 .member-profile-avatar {
   display: grid;
   place-items: center;
+
   width: 70px;
   height: 70px;
-  margin:
-    -35px 0 0 20px;
-  border: 5px solid #111a29;
+
+  margin: 0;
+
+  border:
+    5px solid #111a29;
+
   border-radius: 18px;
-  background: #4057f6;
+
   color: #fff;
-  font-size: calc(22px * var(--font-scale));
+
+  font-size:
+    calc(
+      22px *
+      var(--font-scale)
+    );
+
   font-weight: 800;
 }
 
@@ -9099,4 +9109,126 @@ p {
     );
 
   color: #f0a0ad;
+}
+
+/* Realtime presence */
+
+.presence-avatar-shell {
+  position: relative;
+
+  flex: 0 0 auto;
+}
+
+
+.presence-status-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+
+  z-index: 3;
+
+  width: 10px;
+  height: 10px;
+
+  border:
+    2px solid #0f1725;
+
+  border-radius: 50%;
+
+  pointer-events: none;
+
+  box-shadow:
+    0 0 7px
+    rgba(
+      0,
+      0,
+      0,
+      0.35
+    );
+
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+
+.presence-status-dot.online {
+  background: #4ade80;
+
+  box-shadow:
+    0 0 8px
+    rgba(
+      74,
+      222,
+      128,
+      0.35
+    );
+}
+
+
+.presence-status-dot.away {
+  background: #fbbf24;
+
+  box-shadow:
+    0 0 8px
+    rgba(
+      251,
+      191,
+      36,
+      0.3
+    );
+}
+
+
+.presence-status-dot.dnd {
+  background: #ef4444;
+
+  box-shadow:
+    0 0 8px
+    rgba(
+      239,
+      68,
+      68,
+      0.3
+    );
+}
+
+
+.message-avatar-shell,
+.member-avatar-shell {
+  width: 38px;
+  height: 38px;
+}
+
+
+.channel-member-avatar-shell {
+  width: 36px;
+  height: 36px;
+}
+
+
+.mention-suggestion-avatar-shell {
+  width: 30px;
+  height: 30px;
+}
+
+
+.member-profile-avatar-shell {
+  width: 70px;
+  height: 70px;
+
+  margin:
+    -35px 0 0 20px;
+}
+
+
+.member-profile-presence-dot {
+  right: -3px;
+  bottom: -3px;
+
+  width: 15px;
+  height: 15px;
+
+  border-width: 3px;
+  border-color: #111a29;
 }

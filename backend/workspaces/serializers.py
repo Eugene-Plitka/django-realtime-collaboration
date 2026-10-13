@@ -60,6 +60,11 @@ class WorkspaceMembershipSerializer(
         read_only=True,
     )
 
+    status = serializers.CharField(
+        source="user.status",
+        read_only=True,
+    )
+
     avatar_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -71,6 +76,7 @@ class WorkspaceMembershipSerializer(
             "username",
             "email",
             "avatar_url",
+            "status",
             "role",
             "joined_at",
         )

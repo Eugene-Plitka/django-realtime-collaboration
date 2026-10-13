@@ -73,6 +73,11 @@ class ChannelMembershipSerializer(
         read_only=True,
     )
 
+    status = serializers.CharField(
+        source="user.status",
+        read_only=True,
+    )
+
     avatar_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -84,6 +89,7 @@ class ChannelMembershipSerializer(
             "username",
             "email",
             "avatar_url",
+            "status",
             "joined_at",
         )
 
@@ -125,6 +131,10 @@ class ReplyToMessageSerializer(
         read_only=True,
     )
 
+    author_status = serializers.CharField(
+        read_only=True,
+    )
+
     text = serializers.CharField(
         allow_null=True,
         read_only=True,
@@ -143,6 +153,11 @@ class MessageSerializer(
         read_only=True,
     )
 
+    author_status = serializers.CharField(
+        source="author.status",
+        read_only=True,
+    )
+
     author_avatar_url = serializers.SerializerMethodField()
 
     reply_to_message = serializers.SerializerMethodField()
@@ -156,6 +171,7 @@ class MessageSerializer(
             "author",
             "author_username",
             "author_avatar_url",
+            "author_status",
             "reply_to",
             "reply_to_message",
             "text",
@@ -171,6 +187,7 @@ class MessageSerializer(
             "author",
             "author_username",
             "author_avatar_url",
+            "author_status",
             "reply_to",
             "reply_to_message",
             "created_at",
@@ -203,17 +220,16 @@ class MessageSerializer(
         return {
             "id": reply_to.id,
             "author_id": reply_to.author_id,
-            "author_username": (reply_to.author.username),
-            "author_avatar_url": (
-                get_user_avatar_url(
-                    reply_to.author,
-                    request=self.context.get(
-                        "request",
-                    ),
-                )
+            "author_username": reply_to.author.username,
+            "author_avatar_url": get_user_avatar_url(
+                reply_to.author,
+                request=self.context.get(
+                    "request",
+                ),
             ),
+            "author_status": reply_to.author.status,
             "text": (None if reply_to.is_deleted else reply_to.text),
-            "is_deleted": (reply_to.is_deleted),
+            "is_deleted": reply_to.is_deleted,
         }
 
     def to_representation(

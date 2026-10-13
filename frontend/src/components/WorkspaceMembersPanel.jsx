@@ -9,6 +9,7 @@ import {
   readApiError,
 } from "../api/client";
 import InviteMemberModal from "./InviteMemberModal";
+import PresenceStatusDot from "./PresenceStatusDot";
 import UserAvatar from "./UserAvatar";
 
 
@@ -461,15 +462,26 @@ function WorkspaceMembersPanel({
                         className="member-row"
                         key={member.id}
                       >
-                        <UserAvatar
-                          className="member-avatar"
-                          username={
-                            member.username
-                          }
-                          avatarUrl={
-                            member.avatar_url
-                          }
-                        />
+                        <div className="presence-avatar-shell member-avatar-shell">
+                          <UserAvatar
+                            className="member-avatar"
+                            username={
+                              member.username
+                            }
+                            avatarUrl={
+                              member.avatar_url
+                            }
+                          />
+
+                          <PresenceStatusDot
+                            userId={
+                              member.user_id
+                            }
+                            status={
+                              member.status
+                            }
+                          />
+                        </div>
 
                         <div className="member-identity">
                           <strong>

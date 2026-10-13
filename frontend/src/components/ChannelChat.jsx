@@ -16,6 +16,7 @@ import {
 } from "../chat/socket";
 import ChannelActionsMenu from "./ChannelActionsMenu";
 import MemberProfilePopover from "./MemberProfilePopover";
+import PresenceStatusDot from "./PresenceStatusDot";
 import UserAvatar from "./UserAvatar";
 
 
@@ -33,19 +34,25 @@ function normalizeMessage(message) {
     author_avatar_url:
       message.author_avatar_url ??
       null,
+    author_status:
+      message.author_status ??
+      "ONLINE",
     reply_to:
       message.reply_to ?? null,
     reply_to_message:
       message.reply_to_message ??
       null,
     text: message.text,
-    created_at: message.created_at,
-    updated_at: message.updated_at,
-    edited_at: message.edited_at,
-    is_deleted: message.is_deleted,
+    created_at:
+      message.created_at,
+    updated_at:
+      message.updated_at,
+    edited_at:
+      message.edited_at,
+    is_deleted:
+      message.is_deleted,
   };
 }
-
 
 function mergeMessages(
   currentMessages,
@@ -1729,15 +1736,26 @@ function ChannelChat({
                         message.id
                       }
                     >
-                      <UserAvatar
-                        className="message-avatar"
-                        username={
-                          message.author_username
-                        }
-                        avatarUrl={
-                          message.author_avatar_url
-                        }
-                      />
+                      <div className="presence-avatar-shell message-avatar-shell">
+                        <UserAvatar
+                          className="message-avatar"
+                          username={
+                            message.author_username
+                          }
+                          avatarUrl={
+                            message.author_avatar_url
+                          }
+                        />
+
+                        <PresenceStatusDot
+                          userId={
+                            message.author
+                          }
+                          status={
+                            message.author_status
+                          }
+                        />
+                      </div>
 
                       <div className="message-content">
                         {message.reply_to_message && (
@@ -2108,15 +2126,26 @@ function ChannelChat({
                       );
                     }}
                   >
-                    <UserAvatar
-                      className="mention-suggestion-avatar"
-                      username={
-                        member.username
-                      }
-                      avatarUrl={
-                        member.avatar_url
-                      }
-                    />
+                    <div className="presence-avatar-shell mention-suggestion-avatar-shell">
+                      <UserAvatar
+                        className="mention-suggestion-avatar"
+                        username={
+                          member.username
+                        }
+                        avatarUrl={
+                          member.avatar_url
+                        }
+                      />
+
+                      <PresenceStatusDot
+                        userId={
+                          member.user_id
+                        }
+                        status={
+                          member.status
+                        }
+                      />
+                    </div>
 
                     <span className="mention-suggestion-copy">
                       <strong>

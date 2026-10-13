@@ -13,6 +13,7 @@ import {
   apiRequest,
   readApiError,
 } from "../api/client";
+import PresenceStatusDot from "./PresenceStatusDot";
 import UserAvatar from "./UserAvatar";
 
 
@@ -1003,15 +1004,26 @@ function ChannelActionsMenu({
                           membership.id
                         }
                       >
-                        <UserAvatar
-                          className="channel-member-avatar"
-                          username={
-                            membership.username
-                          }
-                          avatarUrl={
-                            membership.avatar_url
-                          }
-                        />
+                        <div className="presence-avatar-shell channel-member-avatar-shell">
+                          <UserAvatar
+                            className="channel-member-avatar"
+                            username={
+                              membership.username
+                            }
+                            avatarUrl={
+                              membership.avatar_url
+                            }
+                          />
+
+                          <PresenceStatusDot
+                            userId={
+                              membership.user_id
+                            }
+                            status={
+                              membership.status
+                            }
+                          />
+                        </div>
 
                         <div className="channel-member-copy">
                           <strong>
@@ -1114,15 +1126,26 @@ function ChannelActionsMenu({
                           member.user_id
                         }
                       >
-                        <UserAvatar
-                          className="channel-member-avatar"
-                          username={
-                            member.username
-                          }
-                          avatarUrl={
-                            member.avatar_url
-                          }
-                        />
+                        <div className="presence-avatar-shell channel-member-avatar-shell">
+                          <UserAvatar
+                            className="channel-member-avatar"
+                            username={
+                              member.username
+                            }
+                            avatarUrl={
+                              member.avatar_url
+                            }
+                          />
+
+                          <PresenceStatusDot
+                            userId={
+                              member.user_id
+                            }
+                            status={
+                              member.status
+                            }
+                          />
+                        </div>
 
                         <div className="channel-member-copy">
                           <strong>

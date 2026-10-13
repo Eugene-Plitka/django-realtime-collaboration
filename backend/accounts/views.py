@@ -1,18 +1,31 @@
-from allauth.socialaccount.models import SocialAccount
+from allauth.socialaccount.models import (
+    SocialAccount,
+)
 from django.contrib.auth import (
     login as django_login,
     logout as django_logout,
 )
 from django.urls import reverse
-from django.views.decorators.csrf import ensure_csrf_cookie
-from drf_spectacular.utils import extend_schema
-from rest_framework import generics, status
-from rest_framework.authentication import SessionAuthentication
+from django.views.decorators.csrf import (
+    ensure_csrf_cookie,
+)
+from drf_spectacular.utils import (
+    extend_schema,
+)
+from rest_framework import (
+    generics,
+    status,
+)
+from rest_framework.authentication import (
+    SessionAuthentication,
+)
 from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import (
+    NotFound,
+)
 from rest_framework.parsers import (
     FormParser,
     MultiPartParser,
@@ -21,10 +34,17 @@ from rest_framework.permissions import (
     AllowAny,
     IsAuthenticated,
 )
-from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.response import (
+    Response,
+)
+from rest_framework_simplejwt.tokens import (
+    RefreshToken,
+)
 
 from .models import User
+from .presence import (
+    broadcast_user_status,
+)
 from .serializers import (
     AvatarUploadSerializer,
     ChangePasswordSerializer,
@@ -78,6 +98,7 @@ class MeView(
     generics.RetrieveUpdateAPIView,
 ):
     serializer_class = UserSerializer
+
     permission_classes = [
         IsAuthenticated,
     ]
@@ -89,6 +110,19 @@ class MeView(
 
     def get_object(self):
         return self.request.user
+
+    def perform_update(
+        self,
+        serializer,
+    ):
+        previous_status = serializer.instance.status
+
+        user = serializer.save()
+
+        if user.status != previous_status:
+            broadcast_user_status(
+                user,
+            )
 
 
 class AvatarView(
