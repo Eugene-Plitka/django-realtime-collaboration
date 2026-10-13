@@ -2,15 +2,27 @@ from accounts.models import User
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
-from rest_framework.exceptions import NotFound, PermissionDenied
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import (
+    NotFound,
+    PermissionDenied,
+)
+from rest_framework.permissions import (
+    IsAuthenticated,
+)
 from rest_framework.response import Response
-from workspaces.models import Workspace, WorkspaceMembership
-from workspaces.permissions import get_workspace_membership
+from workspaces.models import (
+    Workspace,
+    WorkspaceMembership,
+)
+from workspaces.permissions import (
+    get_workspace_membership,
+)
 
 from .models import (
     Channel,
     ChannelMembership,
+    DirectConversation,
+    DirectMessage,
     Message,
 )
 from .pagination import MessageCursorPagination
@@ -27,11 +39,16 @@ from .serializers import (
     ChannelMemberAddSerializer,
     ChannelMembershipSerializer,
     ChannelSerializer,
+    DirectConversationCreateSerializer,
+    DirectConversationSerializer,
+    DirectMessageSerializer,
     MessageSerializer,
 )
 from .services import (
     add_channel_member,
     create_channel,
+    create_direct_conversation,
+    create_group_conversation,
     delete_channel,
     join_channel,
     leave_channel,
@@ -488,6 +505,231 @@ class MessageListView(generics.ListAPIView):
             )
             .prefetch_related(
                 "reactions",
+            )
+            .order_by(
+                "-created_at",
+            )
+        )
+
+
+class DirectConversationListCreateView(
+    generics.GenericAPIView,
+):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get_workspace(self):
+        try:
+            workspace = Workspace.objects.get(
+                pk=self.kwargs["workspace_id"],
+            )
+        except Workspace.DoesNotExist:
+            raise NotFound()
+
+        membership = get_workspace_membership(
+            workspace=workspace,
+            user=self.request.user,
+        )
+
+        if membership is None:
+            raise NotFound()
+
+        return workspace
+
+    @extend_schema(
+        responses={
+            200: DirectConversationSerializer(
+                many=True,
+            ),
+        },
+    )
+    def get(
+        self,
+        request,
+        workspace_id,
+    ):
+        workspace = self.get_workspace()
+
+        conversations = (
+            DirectConversation.objects.filter(
+                workspace=workspace,
+                participants__user=request.user,
+            )
+            .select_related(
+                "workspace",
+                "created_by",
+            )
+            .prefetch_related(
+                "participants__user",
+            )
+            .distinct()
+            .order_by(
+                "-updated_at",
+            )
+        )
+
+        serializer = DirectConversationSerializer(
+            conversations,
+            many=True,
+            context={
+                "request": request,
+            },
+        )
+
+        return Response(
+            serializer.data,
+        )
+
+    @extend_schema(
+        request=DirectConversationCreateSerializer,
+        responses={
+            200: DirectConversationSerializer,
+            201: DirectConversationSerializer,
+        },
+    )
+    def post(
+        self,
+        request,
+        workspace_id,
+    ):
+        workspace = self.get_workspace()
+
+        serializer = DirectConversationCreateSerializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        participant_ids = serializer.validated_data["participant_ids"]
+
+        participant_users = list(
+            User.objects.filter(
+                id__in=participant_ids,
+            )
+        )
+
+        found_user_ids = {participant.id for participant in participant_users}
+
+        missing_user_ids = set(participant_ids) - found_user_ids
+
+        if missing_user_ids:
+            raise NotFound("One or more participants were not found.")
+
+        conversation_type = serializer.validated_data["type"]
+
+        try:
+            if conversation_type == DirectConversation.Type.DIRECT:
+                (
+                    conversation,
+                    created,
+                ) = create_direct_conversation(
+                    workspace=workspace,
+                    created_by=request.user,
+                    participant_users=participant_users,
+                )
+
+                response_status = (
+                    status.HTTP_201_CREATED if created else status.HTTP_200_OK
+                )
+            else:
+                conversation = create_group_conversation(
+                    workspace=workspace,
+                    created_by=request.user,
+                    participant_users=participant_users,
+                    name=serializer.validated_data["name"],
+                )
+
+                response_status = status.HTTP_201_CREATED
+        except ValueError as exc:
+            return Response(
+                {
+                    "detail": str(exc),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        conversation = (
+            DirectConversation.objects.select_related(
+                "workspace",
+                "created_by",
+            )
+            .prefetch_related(
+                "participants__user",
+            )
+            .get(
+                pk=conversation.pk,
+            )
+        )
+
+        response_serializer = DirectConversationSerializer(
+            conversation,
+            context={
+                "request": request,
+            },
+        )
+
+        return Response(
+            response_serializer.data,
+            status=response_status,
+        )
+
+
+class DirectConversationDetailView(
+    generics.RetrieveAPIView,
+):
+    serializer_class = DirectConversationSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get_queryset(self):
+        return (
+            DirectConversation.objects.filter(
+                participants__user=self.request.user,
+            )
+            .select_related(
+                "workspace",
+                "created_by",
+            )
+            .prefetch_related(
+                "participants__user",
+            )
+            .distinct()
+        )
+
+
+class DirectMessageListView(
+    generics.ListAPIView,
+):
+    serializer_class = DirectMessageSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    pagination_class = MessageCursorPagination
+
+    def get_queryset(self):
+        try:
+            conversation = DirectConversation.objects.get(
+                pk=self.kwargs["conversation_id"],
+                participants__user=self.request.user,
+            )
+        except DirectConversation.DoesNotExist:
+            raise NotFound()
+
+        return (
+            DirectMessage.objects.filter(
+                conversation=conversation,
+            )
+            .select_related(
+                "author",
+                "reply_to",
+                "reply_to__author",
             )
             .order_by(
                 "-created_at",

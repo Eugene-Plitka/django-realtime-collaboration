@@ -96,6 +96,7 @@ SPECTACULAR_SETTINGS = {
             "GUEST",
         ],
         "ChannelTypeEnum": ("chat.models.Channel.Type"),
+        "DirectConversationTypeEnum": ("chat.models.DirectConversation.Type"),
         "NotificationTypeEnum": ("notifications.models.Notification.Type"),
     },
 }

@@ -7,6 +7,9 @@ from .views import (
     ChannelListCreateView,
     ChannelMemberListCreateView,
     ChannelMemberRemoveView,
+    DirectConversationDetailView,
+    DirectConversationListCreateView,
+    DirectMessageListView,
     MessageListView,
 )
 
@@ -45,5 +48,20 @@ urlpatterns = [
         "channels/<int:channel_id>/messages/",
         MessageListView.as_view(),
         name="message-list",
+    ),
+    path(
+        ("workspaces/<int:workspace_id>/direct-conversations/"),
+        DirectConversationListCreateView.as_view(),
+        name="direct-conversation-list-create",
+    ),
+    path(
+        ("direct-conversations/<int:pk>/"),
+        DirectConversationDetailView.as_view(),
+        name="direct-conversation-detail",
+    ),
+    path(
+        ("direct-conversations/<int:conversation_id>/messages/"),
+        DirectMessageListView.as_view(),
+        name="direct-message-list",
     ),
 ]
