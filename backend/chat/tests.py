@@ -19,6 +19,7 @@ from .models import (
     Channel,
     ChannelMembership,
     Message,
+    MessageReaction,
 )
 from .services import create_message
 
@@ -995,6 +996,54 @@ class MessageAPITests(APITestCase):
             msg=(f"Message history uses too many SQL queries: {len(queries)}"),
         )
 
+    def test_message_list_returns_reaction_summary(
+        self,
+    ):
+        message = create_message(
+            channel=self.channel,
+            author=self.member,
+            text="React to this",
+        )
+
+        MessageReaction.objects.create(
+            message=message,
+            user=self.member,
+            emoji=MessageReaction.Emoji.THUMBS_UP,
+        )
+
+        MessageReaction.objects.create(
+            message=message,
+            user=self.owner,
+            emoji=MessageReaction.Emoji.THUMBS_UP,
+        )
+
+        response = self.client.get(
+            reverse(
+                "message-list",
+                kwargs={
+                    "channel_id": self.channel.id,
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        reactions = response.data["results"][0]["reactions"]
+
+        self.assertEqual(
+            reactions,
+            [
+                {
+                    "emoji": MessageReaction.Emoji.THUMBS_UP,
+                    "count": 2,
+                    "user_reacted": True,
+                }
+            ],
+        )
+
 
 @database_sync_to_async
 def message_exists(*, channel, author, text):
@@ -1040,6 +1089,20 @@ def create_test_message(*, channel, author, text):
 @database_sync_to_async
 def message_count():
     return Message.objects.count()
+
+
+@database_sync_to_async
+def reaction_count(
+    *,
+    message_id,
+    user_id,
+    emoji,
+):
+    return MessageReaction.objects.filter(
+        message_id=message_id,
+        user_id=user_id,
+        emoji=emoji,
+    ).count()
 
 
 class ChannelWebSocketTests(TransactionTestCase):
@@ -1913,159 +1976,297 @@ class ChannelWebSocketTests(TransactionTestCase):
 
         await communicator.disconnect()
 
-        async def test_member_can_reply_to_message_via_websocket(self):
-            original_message = await create_test_message(
-                channel=self.channel,
-                author=self.second_member,
-                text="Original message",
-            )
+    async def test_member_can_reply_to_message_via_websocket(self):
+        original_message = await create_test_message(
+            channel=self.channel,
+            author=self.second_member,
+            text="Original message",
+        )
 
-            communicator = WebsocketCommunicator(
-                application,
-                f"/ws/channels/{self.channel.id}/",
-                subprotocols=[f"jwt.{self.member_token}"],
-            )
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
 
-            connected, _ = await communicator.connect()
+        connected, _ = await communicator.connect()
 
-            self.assertTrue(connected)
+        self.assertTrue(connected)
 
-            await communicator.send_json_to(
-                {
-                    "type": "message.create",
-                    "data": {
-                        "text": "Reply message",
-                        "reply_to_id": original_message.id,
-                    },
-                }
-            )
+        await communicator.send_json_to(
+            {
+                "type": "message.create",
+                "data": {
+                    "text": "Reply message",
+                    "reply_to_id": original_message.id,
+                },
+            }
+        )
 
-            response = await communicator.receive_json_from()
+        response = await communicator.receive_json_from()
 
-            self.assertEqual(
-                response["type"],
-                "message.created",
-            )
+        self.assertEqual(
+            response["type"],
+            "message.created",
+        )
 
-            self.assertEqual(
-                response["data"]["text"],
-                "Reply message",
-            )
+        self.assertEqual(
+            response["data"]["text"],
+            "Reply message",
+        )
 
-            self.assertEqual(
-                response["data"]["reply_to"],
-                original_message.id,
-            )
+        self.assertEqual(
+            response["data"]["reply_to"],
+            original_message.id,
+        )
 
-            self.assertEqual(
-                response["data"]["reply_to_message"]["id"],
-                original_message.id,
-            )
+        self.assertEqual(
+            response["data"]["reply_to_message"]["id"],
+            original_message.id,
+        )
 
-            self.assertEqual(
-                response["data"]["reply_to_message"]["text"],
-                "Original message",
-            )
+        self.assertEqual(
+            response["data"]["reply_to_message"]["text"],
+            "Original message",
+        )
 
-            self.assertEqual(
-                response["data"]["reply_to_message"]["author_username"],
-                self.second_member.username,
-            )
+        self.assertEqual(
+            response["data"]["reply_to_message"]["author_username"],
+            self.second_member.username,
+        )
 
-            await communicator.disconnect()
+        await communicator.disconnect()
 
-        async def test_reply_to_nonexistent_message_is_rejected(self):
-            communicator = WebsocketCommunicator(
-                application,
-                f"/ws/channels/{self.channel.id}/",
-                subprotocols=[f"jwt.{self.member_token}"],
-            )
+    async def test_reply_to_nonexistent_message_is_rejected(self):
+        communicator = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
 
-            connected, _ = await communicator.connect()
+        connected, _ = await communicator.connect()
 
-            self.assertTrue(connected)
+        self.assertTrue(connected)
 
-            await communicator.send_json_to(
-                {
-                    "type": "message.create",
-                    "data": {
-                        "text": "Reply",
-                        "reply_to_id": 999999,
-                    },
-                }
-            )
+        await communicator.send_json_to(
+            {
+                "type": "message.create",
+                "data": {
+                    "text": "Reply",
+                    "reply_to_id": 999999,
+                },
+            }
+        )
 
-            response = await communicator.receive_json_from()
+        response = await communicator.receive_json_from()
 
-            self.assertEqual(
-                response["type"],
-                "error",
-            )
+        self.assertEqual(
+            response["type"],
+            "error",
+        )
 
-            self.assertEqual(
-                response["data"]["code"],
-                "reply_message_not_found",
-            )
+        self.assertEqual(
+            response["data"]["code"],
+            "reply_message_not_found",
+        )
 
-            await communicator.disconnect()
+        await communicator.disconnect()
 
-        async def test_reply_payload_is_broadcast_to_other_member(self):
-            original_message = await create_test_message(
-                channel=self.channel,
-                author=self.second_member,
-                text="Original broadcast",
-            )
+    async def test_reply_payload_is_broadcast_to_other_member(self):
+        original_message = await create_test_message(
+            channel=self.channel,
+            author=self.second_member,
+            text="Original broadcast",
+        )
 
-            sender = WebsocketCommunicator(
-                application,
-                f"/ws/channels/{self.channel.id}/",
-                subprotocols=[f"jwt.{self.member_token}"],
-            )
+        sender = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
 
-            receiver = WebsocketCommunicator(
-                application,
-                f"/ws/channels/{self.channel.id}/",
-                subprotocols=[f"jwt.{self.second_member_token}"],
-            )
+        receiver = WebsocketCommunicator(
+            application,
+            f"/ws/channels/{self.channel.id}/",
+            subprotocols=[f"jwt.{self.second_member_token}"],
+        )
 
-            sender_connected, _ = await sender.connect()
-            receiver_connected, _ = await receiver.connect()
+        sender_connected, _ = await sender.connect()
+        receiver_connected, _ = await receiver.connect()
 
-            self.assertTrue(sender_connected)
-            self.assertTrue(receiver_connected)
+        self.assertTrue(sender_connected)
+        self.assertTrue(receiver_connected)
 
-            await sender.send_json_to(
-                {
-                    "type": "message.create",
-                    "data": {
-                        "text": "Realtime reply",
-                        "reply_to_id": original_message.id,
-                    },
-                }
-            )
+        await sender.send_json_to(
+            {
+                "type": "message.create",
+                "data": {
+                    "text": "Realtime reply",
+                    "reply_to_id": original_message.id,
+                },
+            }
+        )
 
-            sender_response = await sender.receive_json_from()
-            receiver_response = await receiver.receive_json_from()
+        sender_response = await sender.receive_json_from()
+        receiver_response = await receiver.receive_json_from()
 
-            self.assertEqual(
-                sender_response["type"],
-                "message.created",
-            )
+        self.assertEqual(
+            sender_response["type"],
+            "message.created",
+        )
 
-            self.assertEqual(
-                receiver_response["type"],
-                "message.created",
-            )
+        self.assertEqual(
+            receiver_response["type"],
+            "message.created",
+        )
 
-            self.assertEqual(
-                receiver_response["data"]["reply_to"],
-                original_message.id,
-            )
+        self.assertEqual(
+            receiver_response["data"]["reply_to"],
+            original_message.id,
+        )
 
-            self.assertEqual(
-                receiver_response["data"]["reply_to_message"]["text"],
-                "Original broadcast",
-            )
+        self.assertEqual(
+            receiver_response["data"]["reply_to_message"]["text"],
+            "Original broadcast",
+        )
 
-            await sender.disconnect()
-            await receiver.disconnect()
+        await sender.disconnect()
+        await receiver.disconnect()
+
+    async def test_member_can_toggle_reaction_via_websocket(
+        self,
+    ):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.owner,
+            text="Reaction target",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/channels/{self.channel.id}/"),
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertTrue(
+            connected,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "reaction.toggle",
+                "data": {
+                    "message_id": message.id,
+                    "emoji": MessageReaction.Emoji.THUMBS_UP,
+                },
+            }
+        )
+
+        added_response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            added_response["type"],
+            "reaction.updated",
+        )
+
+        self.assertEqual(
+            added_response["data"]["count"],
+            1,
+        )
+
+        self.assertTrue(
+            added_response["data"]["reacted"],
+        )
+
+        self.assertEqual(
+            await reaction_count(
+                message_id=message.id,
+                user_id=self.member.id,
+                emoji=(MessageReaction.Emoji.THUMBS_UP),
+            ),
+            1,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "reaction.toggle",
+                "data": {
+                    "message_id": message.id,
+                    "emoji": MessageReaction.Emoji.THUMBS_UP,
+                },
+            }
+        )
+
+        removed_response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            removed_response["type"],
+            "reaction.updated",
+        )
+
+        self.assertEqual(
+            removed_response["data"]["count"],
+            0,
+        )
+
+        self.assertFalse(
+            removed_response["data"]["reacted"],
+        )
+
+        self.assertEqual(
+            await reaction_count(
+                message_id=message.id,
+                user_id=self.member.id,
+                emoji=(MessageReaction.Emoji.THUMBS_UP),
+            ),
+            0,
+        )
+
+        await communicator.disconnect()
+
+    async def test_unsupported_reaction_is_rejected(
+        self,
+    ):
+        message = await create_test_message(
+            channel=self.channel,
+            author=self.owner,
+            text="Reaction target",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/channels/{self.channel.id}/"),
+            subprotocols=[f"jwt.{self.member_token}"],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertTrue(
+            connected,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "reaction.toggle",
+                "data": {
+                    "message_id": message.id,
+                    "emoji": "💣",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "error",
+        )
+
+        self.assertEqual(
+            response["data"]["code"],
+            "invalid_reaction",
+        )
+
+        await communicator.disconnect()

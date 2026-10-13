@@ -16,6 +16,7 @@ from .models import (
     Channel,
     ChannelMembership,
     Message,
+    MessageReaction,
 )
 from .permissions import (
     can_delete_message,
@@ -68,9 +69,10 @@ def message_to_data(
         "reply_to_message": reply_to_data(
             message,
         ),
+        "reactions": [],
         "text": (None if message.is_deleted else message.text),
-        "created_at": message.created_at.isoformat(),
-        "updated_at": message.updated_at.isoformat(),
+        "created_at": (message.created_at.isoformat()),
+        "updated_at": (message.updated_at.isoformat()),
         "edited_at": (message.edited_at.isoformat() if message.edited_at else None),
         "is_deleted": message.is_deleted,
     }
@@ -251,6 +253,67 @@ def delete_message_for_user(
     )
 
 
+@database_sync_to_async
+def toggle_reaction_for_user(
+    *,
+    channel_id,
+    message_id,
+    user,
+    emoji,
+):
+    try:
+        message = Message.objects.get(
+            pk=message_id,
+            channel_id=channel_id,
+        )
+    except Message.DoesNotExist:
+        return (
+            None,
+            "message_not_found",
+        )
+
+    if message.is_deleted:
+        return (
+            None,
+            "message_deleted",
+        )
+
+    reaction = MessageReaction.objects.filter(
+        message=message,
+        user=user,
+        emoji=emoji,
+    ).first()
+
+    if reaction is None:
+        MessageReaction.objects.create(
+            message=message,
+            user=user,
+            emoji=emoji,
+        )
+
+        reacted = True
+    else:
+        reaction.delete()
+
+        reacted = False
+
+    count = MessageReaction.objects.filter(
+        message=message,
+        emoji=emoji,
+    ).count()
+
+    return (
+        {
+            "message_id": message.id,
+            "emoji": emoji,
+            "count": count,
+            "user_id": user.id,
+            "reacted": reacted,
+        },
+        None,
+    )
+
+
 class ChannelConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         user = self.scope["user"]
@@ -362,6 +425,12 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
 
         if event_type == "message.delete":
             await self.handle_message_delete(
+                data,
+            )
+            return
+
+        if event_type == "reaction.toggle":
+            await self.handle_reaction_toggle(
                 data,
             )
             return
@@ -660,6 +729,85 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json(
             {
                 "type": "message.deleted",
+                "data": event["data"],
+            }
+        )
+
+    async def handle_reaction_toggle(
+        self,
+        data,
+    ):
+        user = self.scope["user"]
+
+        has_access = await user_has_channel_access(
+            channel_id=self.channel_id,
+            user=user,
+        )
+
+        if not has_access:
+            await self.send_error(
+                code="channel_access_denied",
+                message=("You no longer have access to this channel."),
+            )
+            return
+
+        message_id = data.get(
+            "message_id",
+        )
+
+        emoji = data.get(
+            "emoji",
+        )
+
+        if not isinstance(
+            message_id,
+            int,
+        ):
+            await self.send_error(
+                code="invalid_message_id",
+                message=("Message id must be an integer."),
+            )
+            return
+
+        if emoji not in (MessageReaction.Emoji.values):
+            await self.send_error(
+                code="invalid_reaction",
+                message=("Unsupported reaction emoji."),
+            )
+            return
+
+        (
+            reaction_data,
+            error,
+        ) = await toggle_reaction_for_user(
+            channel_id=self.channel_id,
+            message_id=message_id,
+            user=user,
+            emoji=emoji,
+        )
+
+        if error:
+            await self.send_error(
+                code=error,
+                message=("Reaction could not be updated."),
+            )
+            return
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "reaction.updated",
+                "data": reaction_data,
+            },
+        )
+
+    async def reaction_updated(
+        self,
+        event,
+    ):
+        await self.send_json(
+            {
+                "type": "reaction.updated",
                 "data": event["data"],
             }
         )

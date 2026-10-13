@@ -145,6 +145,22 @@ class ReplyToMessageSerializer(
     )
 
 
+class MessageReactionSummarySerializer(
+    serializers.Serializer,
+):
+    emoji = serializers.CharField(
+        read_only=True,
+    )
+
+    count = serializers.IntegerField(
+        read_only=True,
+    )
+
+    user_reacted = serializers.BooleanField(
+        read_only=True,
+    )
+
+
 class MessageSerializer(
     serializers.ModelSerializer,
 ):
@@ -162,6 +178,8 @@ class MessageSerializer(
 
     reply_to_message = serializers.SerializerMethodField()
 
+    reactions = serializers.SerializerMethodField()
+
     class Meta:
         model = Message
 
@@ -174,6 +192,7 @@ class MessageSerializer(
             "author_status",
             "reply_to",
             "reply_to_message",
+            "reactions",
             "text",
             "created_at",
             "updated_at",
@@ -190,6 +209,7 @@ class MessageSerializer(
             "author_status",
             "reply_to",
             "reply_to_message",
+            "reactions",
             "created_at",
             "updated_at",
             "edited_at",
@@ -231,6 +251,52 @@ class MessageSerializer(
             "text": (None if reply_to.is_deleted else reply_to.text),
             "is_deleted": reply_to.is_deleted,
         }
+
+    @extend_schema_field(
+        MessageReactionSummarySerializer(
+            many=True,
+        )
+    )
+    def get_reactions(
+        self,
+        instance,
+    ):
+        request = self.context.get(
+            "request",
+        )
+
+        current_user_id = (
+            request.user.id
+            if request is not None and request.user.is_authenticated
+            else None
+        )
+
+        reaction_rows = list(instance.reactions.all())
+
+        summaries = []
+
+        for emoji, _label in instance.reactions.model.Emoji.choices:
+            matching_reactions = [
+                reaction for reaction in reaction_rows if reaction.emoji == emoji
+            ]
+
+            if not matching_reactions:
+                continue
+
+            summaries.append(
+                {
+                    "emoji": emoji,
+                    "count": len(
+                        matching_reactions,
+                    ),
+                    "user_reacted": any(
+                        reaction.user_id == current_user_id
+                        for reaction in matching_reactions
+                    ),
+                }
+            )
+
+        return summaries
 
     def to_representation(
         self,

@@ -486,5 +486,10 @@ class MessageListView(generics.ListAPIView):
                 "reply_to",
                 "reply_to__author",
             )
-            .order_by("-created_at")
+            .prefetch_related(
+                "reactions",
+            )
+            .order_by(
+                "-created_at",
+            )
         )

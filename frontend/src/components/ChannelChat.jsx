@@ -11,14 +11,23 @@ import {
   readApiError,
   refreshTokens,
 } from "../api/client";
+
 import {
   createChannelSocket,
 } from "../chat/socket";
+
 import ChannelActionsMenu from "./ChannelActionsMenu";
 import MemberProfilePopover from "./MemberProfilePopover";
 import PresenceStatusDot from "./PresenceStatusDot";
 import UserAvatar from "./UserAvatar";
 
+const REACTION_OPTIONS = [
+  "👍",
+  "❤️",
+  "😂",
+  "🎉",
+  "🔥",
+];
 
 function normalizeMessage(message) {
   return {
@@ -42,6 +51,8 @@ function normalizeMessage(message) {
     reply_to_message:
       message.reply_to_message ??
       null,
+    reactions:
+      message.reactions ?? [],
     text: message.text,
     created_at:
       message.created_at,
@@ -59,21 +70,18 @@ function mergeMessages(
   incomingMessages,
 ) {
   const messageMap = new Map();
-
   for (const message of currentMessages) {
     messageMap.set(
       message.id,
       normalizeMessage(message),
     );
   }
-
   for (const message of incomingMessages) {
     messageMap.set(
       message.id,
       normalizeMessage(message),
     );
   }
-
   return Array.from(
     messageMap.values(),
   ).sort(
@@ -82,7 +90,6 @@ function mergeMessages(
       new Date(second.created_at),
   );
 }
-
 
 function syncReplySnapshots(
   messages,
@@ -96,7 +103,6 @@ function syncReplySnapshots(
       ) {
         return message;
       }
-
       return {
         ...message,
         reply_to_message: {
@@ -120,21 +126,17 @@ function syncReplySnapshots(
   );
 }
 
-
 function apiPathFromUrl(url) {
   if (!url) {
     return null;
   }
-
   const parsedUrl =
     new URL(url);
-
   return (
     parsedUrl.pathname +
     parsedUrl.search
   );
 }
-
 
 function formatMessageTime(value) {
   return new Intl.DateTimeFormat(
@@ -148,8 +150,6 @@ function formatMessageTime(value) {
   );
 }
 
-
-
 function findMentionAtCursor(
   text,
   cursorPosition,
@@ -159,33 +159,26 @@ function findMentionAtCursor(
       0,
       cursorPosition,
     );
-
   const match =
     beforeCursor.match(
       /(^|\s)@([A-Za-z0-9_.+-]*)$/,
     );
-
   if (!match) {
     return null;
   }
-
   const prefix =
     match[1] ?? "";
-
   const query =
     match[2] ?? "";
-
   const start =
     match.index +
     prefix.length;
-
   return {
     start,
     end: cursorPosition,
     query,
   };
 }
-
 
 function ChannelChat({
   channel,
@@ -196,126 +189,99 @@ function ChannelChat({
 }) {
   const [messages, setMessages] =
     useState([]);
-
   const [nextPage, setNextPage] =
     useState(null);
-
   const [
     historyLoading,
     setHistoryLoading,
   ] = useState(true);
-
   const [
     olderLoading,
     setOlderLoading,
   ] = useState(false);
-
   const [chatError, setChatError] =
     useState("");
-
   const [
     socketStatus,
     setSocketStatus,
   ] = useState("connecting");
-
   const [composer, setComposer] =
     useState("");
-
   const [sending, setSending] =
     useState(false);
-
   const [
     workspaceRole,
     setWorkspaceRole,
   ] = useState(null);
-
   const [
     workspaceMembers,
     setWorkspaceMembers,
   ] = useState([]);
-
   const [
     selectedProfileMember,
     setSelectedProfileMember,
   ] = useState(null);
-
   const [
     mentionState,
     setMentionState,
   ] = useState(null);
-
   const [
     mentionActiveIndex,
     setMentionActiveIndex,
   ] = useState(0);
-
   const [
     typingUsers,
     setTypingUsers,
   ] = useState([]);
-
   const [
     editingMessageId,
     setEditingMessageId,
   ] = useState(null);
-
   const [editText, setEditText] =
     useState("");
-
   const [
     pendingDeleteMessageId,
     setPendingDeleteMessageId,
   ] = useState(null);
-
   const [
     replyTarget,
     setReplyTarget,
   ] = useState(null);
-
   const [
     highlightedMessageId,
     setHighlightedMessageId,
   ] = useState(null);
-
+  const [
+    reactionPickerMessageId,
+    setReactionPickerMessageId,
+  ] = useState(null);
   const socketRef =
     useRef(null);
-
   const reconnectTimerRef =
     useRef(null);
-
   const reconnectAllowedRef =
     useRef(true);
-
   const typingTimerRef =
     useRef(null);
-
   const typingActiveRef =
     useRef(false);
-
   const highlightTimerRef =
     useRef(null);
-
   const bottomRef =
     useRef(null);
-
   const shouldScrollRef =
     useRef(true);
-
   const composerRef =
     useRef(null);
-
-
   const filteredMentionMembers =
     useMemo(
       () => {
         if (!mentionState) {
           return [];
         }
-
         const query =
           mentionState.query
             .toLowerCase();
-
         return workspaceMembers.filter(
           (member) => {
             if (
@@ -324,7 +290,6 @@ function ChannelChat({
             ) {
               return false;
             }
-
             return member.username
               .toLowerCase()
               .startsWith(query);
@@ -337,14 +302,11 @@ function ChannelChat({
         user.id,
       ],
     );
-
-
   const sendSocketEvent =
     useCallback(
       (type, data = {}) => {
         const socket =
           socketRef.current;
-
         if (
           !socket ||
           socket.readyState !==
@@ -352,20 +314,16 @@ function ChannelChat({
         ) {
           return false;
         }
-
         socket.send(
           JSON.stringify({
             type,
             data,
           }),
         );
-
         return true;
       },
       [],
     );
-
-
   const stopTyping =
     useCallback(
       () => {
@@ -375,26 +333,21 @@ function ChannelChat({
           window.clearTimeout(
             typingTimerRef.current,
           );
-
           typingTimerRef.current =
             null;
         }
-
         if (
           typingActiveRef.current
         ) {
           sendSocketEvent(
             "typing.stop",
           );
-
           typingActiveRef.current =
             false;
         }
       },
       [sendSocketEvent],
     );
-
-
   const loadWorkspaceMembers =
     useCallback(
       async () => {
@@ -402,7 +355,6 @@ function ChannelChat({
           await apiRequest(
             `/api/workspaces/${workspace.id}/members/`,
           );
-
         if (!response.ok) {
           throw new Error(
             await readApiError(
@@ -411,21 +363,17 @@ function ChannelChat({
             ),
           );
         }
-
         const members =
           await response.json();
-
         setWorkspaceMembers(
           members,
         );
-
         const membership =
           members.find(
             (member) =>
               member.user_id ===
               user.id,
           );
-
         setWorkspaceRole(
           membership?.role ?? null,
         );
@@ -435,8 +383,6 @@ function ChannelChat({
         user.id,
       ],
     );
-
-
   const loadHistory =
     useCallback(
       async () => {
@@ -444,7 +390,6 @@ function ChannelChat({
           await apiRequest(
             `/api/channels/${channel.id}/messages/`,
           );
-
         if (!response.ok) {
           throw new Error(
             await readApiError(
@@ -453,13 +398,10 @@ function ChannelChat({
             ),
           );
         }
-
         const data =
           await response.json();
-
         shouldScrollRef.current =
           true;
-
         setMessages(
           (currentMessages) =>
             mergeMessages(
@@ -467,7 +409,6 @@ function ChannelChat({
               data.results ?? [],
             ),
         );
-
         setNextPage(
           apiPathFromUrl(
             data.next,
@@ -476,8 +417,6 @@ function ChannelChat({
       },
       [channel.id],
     );
-
-
   const connectSocket =
     useCallback(
       async () => {
@@ -486,13 +425,10 @@ function ChannelChat({
         ) {
           return;
         }
-
         setSocketStatus(
           "connecting",
         );
-
         let socket;
-
         try {
           socket =
             await createChannelSocket(
@@ -502,37 +438,29 @@ function ChannelChat({
           setSocketStatus(
             "error",
           );
-
           setChatError(
             connectionError.message,
           );
-
           return;
         }
-
         if (
           !reconnectAllowedRef.current
         ) {
           socket.close();
           return;
         }
-
         socketRef.current =
           socket;
-
         socket.onopen = () => {
           setSocketStatus(
             "connected",
           );
-
           setChatError("");
         };
-
         socket.onmessage = (
           event,
         ) => {
           let payload;
-
           try {
             payload =
               JSON.parse(
@@ -541,7 +469,6 @@ function ChannelChat({
           } catch {
             return;
           }
-
           if (
             payload.type ===
               "message.created" ||
@@ -554,28 +481,43 @@ function ChannelChat({
               normalizeMessage(
                 payload.data,
               );
-
             shouldScrollRef.current =
               payload.type ===
               "message.created";
-
             setMessages(
               (currentMessages) => {
+                const existingMessage =
+                  currentMessages.find(
+                    (message) =>
+                      message.id ===
+                      changedMessage.id,
+                  );
+                const messageForMerge =
+                  payload.type ===
+                    "message.created"
+                    ? changedMessage
+                    : {
+                        ...changedMessage,
+                        reactions:
+                          existingMessage
+                            ?.reactions ??
+                          changedMessage
+                            .reactions ??
+                          [],
+                      };
                 const merged =
                   mergeMessages(
                     currentMessages,
                     [
-                      changedMessage,
+                      messageForMerge,
                     ],
                   );
-
                 return syncReplySnapshots(
                   merged,
-                  changedMessage,
+                  messageForMerge,
                 );
               },
             );
-
             if (
               payload.type ===
               "message.deleted"
@@ -587,7 +529,6 @@ function ChannelChat({
                     ? null
                     : currentId,
               );
-
               setReplyTarget(
                 (currentReplyTarget) =>
                   currentReplyTarget?.id ===
@@ -596,10 +537,89 @@ function ChannelChat({
                     : currentReplyTarget,
               );
             }
-
             return;
           }
-
+          if (
+            payload.type ===
+            "reaction.updated"
+          ) {
+            const reactionData =
+              payload.data;
+            setMessages(
+              (currentMessages) =>
+                currentMessages.map(
+                  (message) => {
+                    if (
+                      message.id !==
+                      reactionData.message_id
+                    ) {
+                      return message;
+                    }
+                    const existingReaction =
+                      message.reactions.find(
+                        (reaction) =>
+                          reaction.emoji ===
+                          reactionData.emoji,
+                      );
+                    let nextReactions;
+                    if (
+                      reactionData.count <= 0
+                    ) {
+                      nextReactions =
+                        message.reactions.filter(
+                          (reaction) =>
+                            reaction.emoji !==
+                            reactionData.emoji,
+                        );
+                    } else if (
+                      existingReaction
+                    ) {
+                      nextReactions =
+                        message.reactions.map(
+                          (reaction) => {
+                            if (
+                              reaction.emoji !==
+                              reactionData.emoji
+                            ) {
+                              return reaction;
+                            }
+                            return {
+                              ...reaction,
+                              count:
+                                reactionData.count,
+                              user_reacted:
+                                reactionData.user_id ===
+                                user.id
+                                  ? reactionData.reacted
+                                  : reaction.user_reacted,
+                            };
+                          },
+                        );
+                    } else {
+                      nextReactions = [
+                        ...message.reactions,
+                        {
+                          emoji:
+                            reactionData.emoji,
+                          count:
+                            reactionData.count,
+                          user_reacted:
+                            reactionData.user_id ===
+                              user.id &&
+                            reactionData.reacted,
+                        },
+                      ];
+                    }
+                    return {
+                      ...message,
+                      reactions:
+                        nextReactions,
+                    };
+                  },
+                ),
+            );
+            return;
+          }
           if (
             payload.type ===
             "typing.started"
@@ -612,21 +632,17 @@ function ChannelChat({
                       typingUser.user_id ===
                       payload.data.user_id,
                   );
-
                 if (exists) {
                   return currentUsers;
                 }
-
                 return [
                   ...currentUsers,
                   payload.data,
                 ];
               },
             );
-
             return;
           }
-
           if (
             payload.type ===
             "typing.stopped"
@@ -639,10 +655,8 @@ function ChannelChat({
                     payload.data.user_id,
                 ),
             );
-
             return;
           }
-
           if (
             payload.type ===
             "error"
@@ -654,13 +668,11 @@ function ChannelChat({
             );
           }
         };
-
         socket.onerror = () => {
           setSocketStatus(
             "error",
           );
         };
-
         socket.onclose =
           async (event) => {
             if (
@@ -670,52 +682,41 @@ function ChannelChat({
               socketRef.current =
                 null;
             }
-
             setTypingUsers([]);
-
             if (
               !reconnectAllowedRef.current
             ) {
               return;
             }
-
             if (
               event.code === 4403
             ) {
               setSocketStatus(
                 "error",
               );
-
               setChatError(
                 "You no longer have access to this channel.",
               );
-
               return;
             }
-
             if (
               event.code === 4401
             ) {
               const refreshed =
                 await refreshTokens();
-
               if (!refreshed) {
                 setSocketStatus(
                   "error",
                 );
-
                 setChatError(
                   "Your session has expired. Please sign in again.",
                 );
-
                 return;
               }
             }
-
             setSocketStatus(
               "reconnecting",
             );
-
             reconnectTimerRef.current =
               window.setTimeout(
                 () => {
@@ -727,14 +728,10 @@ function ChannelChat({
       },
       [channel.id],
     );
-
-
   useEffect(() => {
     let cancelled = false;
-
     reconnectAllowedRef.current =
       true;
-
     setMessages([]);
     setNextPage(null);
     setComposer("");
@@ -749,35 +746,31 @@ function ChannelChat({
     setSelectedProfileMember(null);
     setReplyTarget(null);
     setHighlightedMessageId(null);
-
+    setReactionPickerMessageId(
+      null,
+    );
     setPendingDeleteMessageId(
       null,
     );
-
     setHistoryLoading(true);
-
     setSocketStatus(
       "connecting",
     );
-
     async function prepareChannel() {
       try {
         await Promise.all([
           loadHistory(),
           loadWorkspaceMembers(),
         ]);
-
         if (cancelled) {
           return;
         }
-
         await connectSocket();
       } catch (requestError) {
         if (!cancelled) {
           setChatError(
             requestError.message,
           );
-
           setSocketStatus(
             "error",
           );
@@ -790,54 +783,42 @@ function ChannelChat({
         }
       }
     }
-
     prepareChannel();
-
     return () => {
       cancelled = true;
-
       reconnectAllowedRef.current =
         false;
-
       if (
         reconnectTimerRef.current
       ) {
         window.clearTimeout(
           reconnectTimerRef.current,
         );
-
         reconnectTimerRef.current =
           null;
       }
-
       if (
         typingTimerRef.current
       ) {
         window.clearTimeout(
           typingTimerRef.current,
         );
-
         typingTimerRef.current =
           null;
       }
-
       if (
         highlightTimerRef.current
       ) {
         window.clearTimeout(
           highlightTimerRef.current,
         );
-
         highlightTimerRef.current =
           null;
       }
-
       typingActiveRef.current =
         false;
-
       if (socketRef.current) {
         socketRef.current.close();
-
         socketRef.current =
           null;
       }
@@ -848,25 +829,19 @@ function ChannelChat({
     loadHistory,
     loadWorkspaceMembers,
   ]);
-
-
   useEffect(() => {
     if (
       !shouldScrollRef.current
     ) {
       return;
     }
-
     bottomRef.current
       ?.scrollIntoView({
         behavior: "smooth",
       });
-
     shouldScrollRef.current =
       false;
   }, [messages]);
-
-
   useEffect(() => {
     if (
       mentionActiveIndex <
@@ -874,14 +849,11 @@ function ChannelChat({
     ) {
       return;
     }
-
     setMentionActiveIndex(0);
   }, [
     filteredMentionMembers.length,
     mentionActiveIndex,
   ]);
-
-
   async function loadOlderMessages() {
     if (
       !nextPage ||
@@ -889,16 +861,13 @@ function ChannelChat({
     ) {
       return;
     }
-
     setOlderLoading(true);
     setChatError("");
-
     try {
       const response =
         await apiRequest(
           nextPage,
         );
-
       if (!response.ok) {
         throw new Error(
           await readApiError(
@@ -907,13 +876,10 @@ function ChannelChat({
           ),
         );
       }
-
       const data =
         await response.json();
-
       shouldScrollRef.current =
         false;
-
       setMessages(
         (currentMessages) =>
           mergeMessages(
@@ -921,7 +887,6 @@ function ChannelChat({
             data.results ?? [],
           ),
       );
-
       setNextPage(
         apiPathFromUrl(
           data.next,
@@ -935,8 +900,6 @@ function ChannelChat({
       setOlderLoading(false);
     }
   }
-
-
   function updateMentionState(
     value,
     cursorPosition,
@@ -946,55 +909,43 @@ function ChannelChat({
         value,
         cursorPosition,
       );
-
     setMentionState(
       nextMentionState,
     );
-
     setMentionActiveIndex(0);
   }
-
-
   function handleComposerChange(
     event,
   ) {
     const value =
       event.target.value;
-
     const cursorPosition =
       event.target.selectionStart ??
       value.length;
-
     setComposer(value);
-
     updateMentionState(
       value,
       cursorPosition,
     );
-
     if (
       socketStatus !==
       "connected"
     ) {
       return;
     }
-
     if (!value.trim()) {
       stopTyping();
       return;
     }
-
     if (
       !typingActiveRef.current
     ) {
       sendSocketEvent(
         "typing.start",
       );
-
       typingActiveRef.current =
         true;
     }
-
     if (
       typingTimerRef.current
     ) {
@@ -1002,7 +953,6 @@ function ChannelChat({
         typingTimerRef.current,
       );
     }
-
     typingTimerRef.current =
       window.setTimeout(
         () => {
@@ -1011,48 +961,37 @@ function ChannelChat({
         1200,
       );
   }
-
-
   function selectMention(member) {
     if (!mentionState) {
       return;
     }
-
     const beforeMention =
       composer.slice(
         0,
         mentionState.start,
       );
-
     const afterMention =
       composer.slice(
         mentionState.end,
       );
-
     const insertedMention =
       `@${member.username} `;
-
     const nextComposer =
       beforeMention +
       insertedMention +
       afterMention;
-
     const nextCursorPosition =
       beforeMention.length +
       insertedMention.length;
-
     setComposer(
       nextComposer,
     );
-
     setMentionState(null);
     setMentionActiveIndex(0);
-
     window.requestAnimationFrame(
       () => {
         composerRef.current
           ?.focus();
-
         composerRef.current
           ?.setSelectionRange(
             nextCursorPosition,
@@ -1061,25 +1000,19 @@ function ChannelChat({
       },
     );
   }
-
-
   function sendMessage() {
     const text =
       composer.trim();
-
     if (!text || sending) {
       return;
     }
-
     const data = {
       text,
     };
-
     if (replyTarget) {
       data.reply_to_id =
         replyTarget.id;
     }
-
     if (
       !sendSocketEvent(
         "message.create",
@@ -1089,22 +1022,16 @@ function ChannelChat({
       setChatError(
         "Chat connection is not ready yet.",
       );
-
       return;
     }
-
     setSending(true);
     setChatError("");
-
     stopTyping();
-
     setComposer("");
     setMentionState(null);
     setReplyTarget(null);
-
     shouldScrollRef.current =
       true;
-
     window.setTimeout(
       () => {
         setSending(false);
@@ -1112,15 +1039,10 @@ function ChannelChat({
       150,
     );
   }
-
-
   function handleSubmit(event) {
     event.preventDefault();
-
     sendMessage();
   }
-
-
   function handleComposerKeyDown(
     event,
   ) {
@@ -1134,7 +1056,6 @@ function ChannelChat({
         "ArrowDown"
       ) {
         event.preventDefault();
-
         setMentionActiveIndex(
           (currentIndex) =>
             (
@@ -1142,16 +1063,13 @@ function ChannelChat({
             ) %
             filteredMentionMembers.length,
         );
-
         return;
       }
-
       if (
         event.key ===
         "ArrowUp"
       ) {
         event.preventDefault();
-
         setMentionActiveIndex(
           (currentIndex) =>
             (
@@ -1161,58 +1079,44 @@ function ChannelChat({
             ) %
             filteredMentionMembers.length,
         );
-
         return;
       }
-
       if (
         event.key === "Enter" ||
         event.key === "Tab"
       ) {
         event.preventDefault();
-
         selectMention(
           filteredMentionMembers[
             mentionActiveIndex
           ],
         );
-
         return;
       }
-
       if (
         event.key === "Escape"
       ) {
         event.preventDefault();
-
         setMentionState(null);
-
         return;
       }
     }
-
     if (
       event.key === "Escape" &&
       replyTarget
     ) {
       event.preventDefault();
-
       setReplyTarget(null);
-
       return;
     }
-
     if (
       event.key === "Enter" &&
       !event.shiftKey
     ) {
       event.preventDefault();
-
       sendMessage();
     }
   }
-
-
   function handleComposerClick(
     event,
   ) {
@@ -1220,25 +1124,20 @@ function ChannelChat({
       event.currentTarget
         .selectionStart ??
       composer.length;
-
     updateMentionState(
       composer,
       cursorPosition,
     );
   }
-
-
   function startReply(message) {
     if (message.is_deleted) {
       return;
     }
-
     setEditingMessageId(null);
     setEditText("");
     setPendingDeleteMessageId(
       null,
     );
-
     setReplyTarget({
       id: message.id,
       author:
@@ -1247,7 +1146,6 @@ function ChannelChat({
         message.author_username,
       text: message.text,
     });
-
     window.requestAnimationFrame(
       () => {
         composerRef.current
@@ -1255,13 +1153,9 @@ function ChannelChat({
       },
     );
   }
-
-
   function cancelReply() {
     setReplyTarget(null);
   }
-
-
   function scrollToMessage(
     messageId,
   ) {
@@ -1269,20 +1163,16 @@ function ChannelChat({
       document.querySelector(
         `[data-message-id="${messageId}"]`,
       );
-
     if (!element) {
       return;
     }
-
     element.scrollIntoView({
       behavior: "smooth",
       block: "center",
     });
-
     setHighlightedMessageId(
       messageId,
     );
-
     if (
       highlightTimerRef.current
     ) {
@@ -1290,7 +1180,6 @@ function ChannelChat({
         highlightTimerRef.current,
       );
     }
-
     highlightTimerRef.current =
       window.setTimeout(
         () => {
@@ -1301,41 +1190,30 @@ function ChannelChat({
         1500,
       );
   }
-
-
   function startEditing(message) {
     setReplyTarget(null);
-
     setPendingDeleteMessageId(
       null,
     );
-
     setEditingMessageId(
       message.id,
     );
-
     setEditText(
       message.text ?? "",
     );
   }
-
-
   function cancelEditing() {
     setEditingMessageId(null);
     setEditText("");
   }
-
-
   function saveEditedMessage(
     messageId,
   ) {
     const text =
       editText.trim();
-
     if (!text) {
       return;
     }
-
     if (
       !sendSocketEvent(
         "message.update",
@@ -1349,14 +1227,10 @@ function ChannelChat({
       setChatError(
         "Chat connection is not ready yet.",
       );
-
       return;
     }
-
     cancelEditing();
   }
-
-
   function handleEditKeyDown(
     event,
     messageId,
@@ -1367,46 +1241,36 @@ function ChannelChat({
       cancelEditing();
       return;
     }
-
     if (
       event.key === "Enter" &&
       !event.shiftKey
     ) {
       event.preventDefault();
-
       saveEditedMessage(
         messageId,
       );
     }
   }
-
-
   function requestDeleteMessage(
     messageId,
   ) {
     setEditingMessageId(null);
     setEditText("");
-
     if (
       replyTarget?.id ===
       messageId
     ) {
       setReplyTarget(null);
     }
-
     setPendingDeleteMessageId(
       messageId,
     );
   }
-
-
   function cancelDeleteMessage() {
     setPendingDeleteMessageId(
       null,
     );
   }
-
-
   function confirmDeleteMessage(
     message,
   ) {
@@ -1422,36 +1286,56 @@ function ChannelChat({
       setChatError(
         "Chat connection is not ready yet.",
       );
-
       return;
     }
-
     setPendingDeleteMessageId(
       null,
     );
   }
-
-
+  function toggleReaction(
+    message,
+    emoji,
+  ) {
+    if (
+      message.is_deleted
+    ) {
+      return;
+    }
+    if (
+      !sendSocketEvent(
+        "reaction.toggle",
+        {
+          message_id:
+            message.id,
+          emoji,
+        },
+      )
+    ) {
+      setChatError(
+        "Chat connection is not ready yet.",
+      );
+      return;
+    }
+    setReactionPickerMessageId(
+      null,
+    );
+  }
   function canDeleteMessage(
     message,
   ) {
     if (message.is_deleted) {
       return false;
     }
-
     if (
       message.author === user.id
     ) {
       return true;
     }
-
     return (
       workspaceRole === "OWNER" ||
       workspaceRole === "ADMIN"
     );
   }
-
-
   function openMemberProfile(
     username,
   ) {
@@ -1462,27 +1346,21 @@ function ChannelChat({
             .toLowerCase() ===
           username.toLowerCase(),
       );
-
     if (!member) {
       return;
     }
-
     setSelectedProfileMember(
       member,
     );
   }
-
-
   function renderMessageText(text) {
     if (!text) {
       return null;
     }
-
     const parts =
       text.split(
         /(@[A-Za-z0-9_.+-]+)/g,
       );
-
     return parts.map(
       (part, index) => {
         if (
@@ -1496,10 +1374,8 @@ function ChannelChat({
             </span>
           );
         }
-
         const username =
           part.slice(1);
-
         const member =
           workspaceMembers.find(
             (workspaceMember) =>
@@ -1507,7 +1383,6 @@ function ChannelChat({
                 .toLowerCase() ===
               username.toLowerCase(),
           );
-
         if (!member) {
           return (
             <span
@@ -1517,7 +1392,6 @@ function ChannelChat({
             </span>
           );
         }
-
         return (
           <button
             className="message-mention"
@@ -1535,18 +1409,13 @@ function ChannelChat({
       },
     );
   }
-
-
   const visibleTypingUsers =
     typingUsers.slice(0, 3);
-
   const hiddenTypingCount =
     Math.max(
       typingUsers.length - 3,
       0,
     );
-
-
   return (
     <>
       <header className="channel-content-header">
@@ -1558,12 +1427,10 @@ function ChannelChat({
                 ? "🔒"
                 : "#"}
             </span>
-
             <h1>
               {channel.name}
             </h1>
           </div>
-
           <p>
             {channel.description ||
               (channel.is_general
@@ -1571,10 +1438,8 @@ function ChannelChat({
                 : "No channel description yet.")}
           </p>
         </div>
-
         <div className="channel-header-actions">
           {activityControls}
-
           <span
             className={[
               "socket-status",
@@ -1582,31 +1447,25 @@ function ChannelChat({
             ].join(" ")}
           >
             <i />
-
             {socketStatus ===
               "connected" &&
               "Live"}
-
             {socketStatus ===
               "connecting" &&
               "Connecting"}
-
             {socketStatus ===
               "reconnecting" &&
               "Reconnecting"}
-
             {socketStatus ===
               "error" &&
               "Offline"}
           </span>
-
           <span className="channel-visibility-pill">
             {channel.type ===
             "PRIVATE"
               ? "Private"
               : "Public"}
           </span>
-
           <ChannelActionsMenu
             channel={channel}
             workspace={workspace}
@@ -1620,18 +1479,15 @@ function ChannelChat({
           />
         </div>
       </header>
-
       <div className="chat-body">
         {historyLoading && (
           <div className="chat-loading">
             <div className="state-spinner" />
-
             <span>
               Loading conversation...
             </span>
           </div>
         )}
-
         {!historyLoading &&
           nextPage && (
             <button
@@ -1649,7 +1505,6 @@ function ChannelChat({
                 : "Load older messages"}
             </button>
           )}
-
         {!historyLoading &&
           messages.length === 0 && (
             <div className="chat-start">
@@ -1659,12 +1514,10 @@ function ChannelChat({
                   ? "🔒"
                   : "#"}
               </div>
-
               <h2>
                 Welcome to #
                 {channel.name}
               </h2>
-
               <p>
                 This is the beginning
                 of this channel.
@@ -1673,7 +1526,6 @@ function ChannelChat({
               </p>
             </div>
           )}
-
         {!historyLoading &&
           messages.length > 0 && (
             <div className="message-list">
@@ -1684,35 +1536,28 @@ function ChannelChat({
                     ? "🔒"
                     : "#"}
                 </div>
-
                 <h2>
                   #{channel.name}
                 </h2>
-
                 <p>
                   {channel.description ||
                     `Welcome to ${workspace.name}.`}
                 </p>
               </div>
-
               {messages.map(
                 (message) => {
                   const isOwn =
                     message.author ===
                     user.id;
-
                   const isEditing =
                     editingMessageId ===
                     message.id;
-
                   const isDeletePending =
                     pendingDeleteMessageId ===
                     message.id;
-
                   const isHighlighted =
                     highlightedMessageId ===
                     message.id;
-
                   return (
                     <article
                       className={[
@@ -1746,7 +1591,6 @@ function ChannelChat({
                             message.author_avatar_url
                           }
                         />
-
                         <PresenceStatusDot
                           userId={
                             message.author
@@ -1756,7 +1600,6 @@ function ChannelChat({
                           }
                         />
                       </div>
-
                       <div className="message-content">
                         {message.reply_to_message && (
                           <button
@@ -1769,7 +1612,6 @@ function ChannelChat({
                             }
                           >
                             <span className="reply-reference-line" />
-
                             <UserAvatar
                               className="reply-reference-avatar"
                               username={
@@ -1781,14 +1623,12 @@ function ChannelChat({
                                   .author_avatar_url
                               }
                             />
-
                             <strong>
                               {
                                 message.reply_to_message
                                   .author_username
                               }
                             </strong>
-
                             <span className="reply-reference-text">
                               {message.reply_to_message
                                 .is_deleted
@@ -1798,7 +1638,6 @@ function ChannelChat({
                             </span>
                           </button>
                         )}
-
                         <div className="message-meta">
                           <button
                             className="message-author-button"
@@ -1811,13 +1650,11 @@ function ChannelChat({
                           >
                             {message.author_username}
                           </button>
-
                           {isOwn && (
                             <span className="message-you">
                               you
                             </span>
                           )}
-
                           <time
                             dateTime={
                               message.created_at
@@ -1827,7 +1664,6 @@ function ChannelChat({
                               message.created_at,
                             )}
                           </time>
-
                           {message.edited_at &&
                             !message.is_deleted && (
                               <span className="message-edited">
@@ -1835,7 +1671,6 @@ function ChannelChat({
                               </span>
                             )}
                         </div>
-
                         {message.is_deleted ? (
                           <p className="deleted-message-text">
                             Message deleted
@@ -1866,13 +1701,11 @@ function ChannelChat({
                               rows={2}
                               autoFocus
                             />
-
                             <div className="message-edit-actions">
                               <span>
                                 Esc to cancel ·
                                 Enter to save
                               </span>
-
                               <button
                                 className="message-action-cancel"
                                 type="button"
@@ -1882,7 +1715,6 @@ function ChannelChat({
                               >
                                 Cancel
                               </button>
-
                               <button
                                 className="message-action-save"
                                 type="button"
@@ -1900,17 +1732,114 @@ function ChannelChat({
                             </div>
                           </div>
                         ) : (
-                          <p className="message-text">
-                            {renderMessageText(
-                              message.text,
-                            )}
-                          </p>
+                          <>
+                            <p className="message-text">
+                              {renderMessageText(
+                                message.text,
+                              )}
+                            </p>
+                            <div className="message-reactions">
+                              {message.reactions.map(
+                                (reaction) => (
+                                  <button
+                                    className={[
+                                      "message-reaction",
+                                      reaction.user_reacted
+                                        ? "active"
+                                        : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ")}
+                                    type="button"
+                                    key={
+                                      reaction.emoji
+                                    }
+                                    title={
+                                      reaction.user_reacted
+                                        ? "Remove reaction"
+                                        : "Add reaction"
+                                    }
+                                    onClick={() =>
+                                      toggleReaction(
+                                        message,
+                                        reaction.emoji,
+                                      )
+                                    }
+                                  >
+                                    <span>
+                                      {reaction.emoji}
+                                    </span>
+                                    <strong>
+                                      {reaction.count}
+                                    </strong>
+                                  </button>
+                                ),
+                              )}
+                              <div className="message-reaction-picker-root">
+                                <button
+                                  className="message-reaction-add"
+                                  type="button"
+                                  title="Add reaction"
+                                  aria-label="Add reaction"
+                                  onClick={() =>
+                                    setReactionPickerMessageId(
+                                      (currentId) =>
+                                        currentId ===
+                                        message.id
+                                          ? null
+                                          : message.id,
+                                    )
+                                  }
+                                >
+                                  +
+                                </button>
+                                {reactionPickerMessageId ===
+                                  message.id && (
+                                  <div className="message-reaction-picker">
+                                    {REACTION_OPTIONS.map(
+                                      (emoji) => (
+                                        <button
+                                          type="button"
+                                          key={emoji}
+                                          title={`React with ${emoji}`}
+                                          onClick={() =>
+                                            toggleReaction(
+                                              message,
+                                              emoji,
+                                            )
+                                          }
+                                        >
+                                          {emoji}
+                                        </button>
+                                      ),
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </>
                         )}
                       </div>
-
                       {!message.is_deleted &&
                         !isEditing && (
                           <div className="message-actions">
+                            {!isDeletePending && (
+                              <button
+                                type="button"
+                                title="React to message"
+                                onClick={() =>
+                                  setReactionPickerMessageId(
+                                    (currentId) =>
+                                      currentId ===
+                                      message.id
+                                        ? null
+                                        : message.id,
+                                  )
+                                }
+                              >
+                                React
+                              </button>
+                            )}
                             {!isDeletePending && (
                               <button
                                 type="button"
@@ -1924,7 +1853,6 @@ function ChannelChat({
                                 Reply
                               </button>
                             )}
-
                             {isOwn &&
                               !isDeletePending && (
                                 <button
@@ -1939,7 +1867,6 @@ function ChannelChat({
                                   Edit
                                 </button>
                               )}
-
                             {canDeleteMessage(
                               message,
                             ) &&
@@ -1957,7 +1884,6 @@ function ChannelChat({
                                   Delete
                                 </button>
                               )}
-
                             {isDeletePending && (
                               <div className="message-delete-confirm">
                                 <button
@@ -1973,7 +1899,6 @@ function ChannelChat({
                                 >
                                   ✓
                                 </button>
-
                                 <button
                                   className="cancel"
                                   type="button"
@@ -1993,14 +1918,12 @@ function ChannelChat({
                   );
                 },
               )}
-
               <div
                 ref={bottomRef}
               />
             </div>
           )}
       </div>
-
       <div className="typing-indicator-row">
         {typingUsers.length >
           0 && (
@@ -2010,7 +1933,6 @@ function ChannelChat({
                 <i />
                 <i />
               </span>
-
               <div className="typing-users-list">
                 {visibleTypingUsers.map(
                   (
@@ -2028,9 +1950,7 @@ function ChannelChat({
                           typingUser.username
                         }
                       </strong>
-
                       {" is typing..."}
-
                       {(
                         index <
                           visibleTypingUsers.length -
@@ -2045,7 +1965,6 @@ function ChannelChat({
                     </span>
                   ),
                 )}
-
                 {hiddenTypingCount >
                   0 && (
                     <span className="typing-user typing-more">
@@ -2055,7 +1974,6 @@ function ChannelChat({
                           hiddenTypingCount
                         }
                       </strong>
-
                       {hiddenTypingCount ===
                       1
                         ? " member is typing..."
@@ -2066,13 +1984,11 @@ function ChannelChat({
             </div>
           )}
       </div>
-
       {chatError && (
         <div className="chat-error">
           <span>
             {chatError}
           </span>
-
           <button
             type="button"
             onClick={() =>
@@ -2084,7 +2000,6 @@ function ChannelChat({
           </button>
         </div>
       )}
-
       <form
         className="message-composer"
         onSubmit={handleSubmit}
@@ -2094,7 +2009,6 @@ function ChannelChat({
             <div className="mention-suggestions-header">
               Members
             </div>
-
             {filteredMentionMembers.length >
             0 ? (
               filteredMentionMembers.map(
@@ -2120,7 +2034,6 @@ function ChannelChat({
                       event,
                     ) => {
                       event.preventDefault();
-
                       selectMention(
                         member,
                       );
@@ -2136,7 +2049,6 @@ function ChannelChat({
                           member.avatar_url
                         }
                       />
-
                       <PresenceStatusDot
                         userId={
                           member.user_id
@@ -2146,12 +2058,10 @@ function ChannelChat({
                         }
                       />
                     </div>
-
                     <span className="mention-suggestion-copy">
                       <strong>
                         {member.username}
                       </strong>
-
                       <span>
                         {member.email}
                       </span>
@@ -2166,13 +2076,11 @@ function ChannelChat({
             )}
           </div>
         )}
-
         {replyTarget && (
           <div className="composer-reply-preview">
             <div className="composer-reply-icon">
               ↪
             </div>
-
             <div className="composer-reply-copy">
               <span>
                 Replying to{" "}
@@ -2182,12 +2090,10 @@ function ChannelChat({
                   }
                 </strong>
               </span>
-
               <p>
                 {replyTarget.text}
               </p>
             </div>
-
             <button
               type="button"
               className="composer-reply-close"
@@ -2201,7 +2107,6 @@ function ChannelChat({
             </button>
           </div>
         )}
-
         <textarea
           ref={composerRef}
           value={composer}
@@ -2228,12 +2133,10 @@ function ChannelChat({
             ) {
               return;
             }
-
             const cursorPosition =
               event.currentTarget
                 .selectionStart ??
               composer.length;
-
             updateMentionState(
               composer,
               cursorPosition,
@@ -2250,7 +2153,6 @@ function ChannelChat({
             "connected"
           }
         />
-
         <div className="composer-footer">
           <span>
             Enter to send ·
@@ -2258,7 +2160,6 @@ function ChannelChat({
             {replyTarget &&
               " · Esc to cancel reply"}
           </span>
-
           <button
             type="submit"
             disabled={
@@ -2272,7 +2173,6 @@ function ChannelChat({
           </button>
         </div>
       </form>
-
       <MemberProfilePopover
         member={
           selectedProfileMember
@@ -2286,6 +2186,5 @@ function ChannelChat({
     </>
   );
 }
-
 
 export default ChannelChat;
