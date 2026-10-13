@@ -10085,3 +10085,49 @@ p {
   width: 16px;
   height: 16px;
 }
+
+/* Direct conversation chat */
+
+.direct-chat-intro {
+  padding-bottom: 22px;
+}
+
+.direct-chat-participants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.direct-chat-participant {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border:
+    1px solid #2b394f;
+  border-radius: 8px;
+  background: #111a29;
+  color: #9aa7b9;
+  font-size:
+    calc(
+      9px *
+      var(--font-scale)
+    );
+}
+
+.direct-chat-participant-avatar-shell {
+  width: 26px;
+  height: 26px;
+}
+
+.direct-chat-participant-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  font-size:
+    calc(
+      8px *
+      var(--font-scale)
+    );
+}

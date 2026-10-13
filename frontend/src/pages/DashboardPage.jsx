@@ -16,7 +16,7 @@ import ChannelActionsMenu from "../components/ChannelActionsMenu";
 import CreateChannelModal from "../components/CreateChannelModal";
 import CreateDirectConversationModal from "../components/CreateDirectConversationModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
-import DirectConversationPreview from "../components/DirectConversationPreview";
+import DirectConversationChat from "../components/DirectConversationChat";
 import HeaderActivityControls from "../components/HeaderActivityControls";
 import PresenceStatusDot from "../components/PresenceStatusDot";
 import SettingsContent from "../components/SettingsContent";
@@ -1702,7 +1702,7 @@ function DashboardPage() {
                 )}
               {mainView === "direct" &&
                 activeDirectConversation && (
-                  <DirectConversationPreview
+                  <DirectConversationChat
                     key={
                       activeDirectConversation.id
                     }

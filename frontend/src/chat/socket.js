@@ -10,7 +10,9 @@ function getWebSocketBaseUrl() {
 
   const url = apiBaseUrl
     ? new URL(apiBaseUrl)
-    : new URL(window.location.origin);
+    : new URL(
+        window.location.origin,
+      );
 
   url.protocol =
     url.protocol === "https:"
@@ -78,11 +80,21 @@ export async function createChannelSocket(
 }
 
 
+export async function createDirectConversationSocket(
+  conversationId,
+) {
+  return createAuthenticatedSocket(
+    `/ws/direct-conversations/${conversationId}/`,
+  );
+}
+
+
 export async function createNotificationSocket() {
   return createAuthenticatedSocket(
     "/ws/notifications/",
   );
 }
+
 
 export async function createPresenceSocket() {
   return createAuthenticatedSocket(
