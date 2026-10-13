@@ -1,7 +1,12 @@
 from accounts.models import User
+from channels.db import database_sync_to_async
+from channels.testing import WebsocketCommunicator
+from config.asgi import application
+from django.test import TransactionTestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 from workspaces.models import (
     WorkspaceMembership,
 )
@@ -392,3 +397,589 @@ class DirectConversationAPITests(
             response.data["results"][0]["text"],
             "Hello member",
         )
+
+
+@database_sync_to_async
+def create_direct_test_message(
+    *,
+    conversation,
+    author,
+    text,
+    reply_to=None,
+):
+    return DirectMessage.objects.create(
+        conversation=conversation,
+        author=author,
+        reply_to=reply_to,
+        text=text,
+    )
+
+
+@database_sync_to_async
+def get_direct_message_state(
+    message_id,
+):
+    message = DirectMessage.objects.get(
+        pk=message_id,
+    )
+
+    return {
+        "text": message.text,
+        "edited_at": message.edited_at,
+        "is_deleted": message.is_deleted,
+    }
+
+
+@database_sync_to_async
+def direct_message_count():
+    return DirectMessage.objects.count()
+
+
+class DirectConversationWebSocketTests(
+    TransactionTestCase,
+):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            email="dm-ws-owner@example.com",
+            username="dm-ws-owner",
+            password="StrongPassword123!",
+        )
+
+        self.member = User.objects.create_user(
+            email="dm-ws-member@example.com",
+            username="dm-ws-member",
+            password="StrongPassword123!",
+        )
+
+        self.second_member = User.objects.create_user(
+            email="dm-ws-second@example.com",
+            username="dm-ws-second",
+            password="StrongPassword123!",
+        )
+
+        self.outsider = User.objects.create_user(
+            email="dm-ws-outsider@example.com",
+            username="dm-ws-outsider",
+            password="StrongPassword123!",
+        )
+
+        self.workspace = create_workspace(
+            name="DM WebSocket Workspace",
+            slug="dm-websocket-workspace",
+            user=self.owner,
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=self.member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=self.second_member,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        add_workspace_member(
+            workspace=self.workspace,
+            user=self.outsider,
+            role=WorkspaceMembership.Role.MEMBER,
+        )
+
+        self.conversation = DirectConversation.objects.create(
+            workspace=self.workspace,
+            type=DirectConversation.Type.GROUP,
+            name="WebSocket DM group",
+            created_by=self.owner,
+        )
+
+        DirectConversationParticipant.objects.create(
+            conversation=self.conversation,
+            user=self.owner,
+        )
+
+        DirectConversationParticipant.objects.create(
+            conversation=self.conversation,
+            user=self.member,
+        )
+
+        DirectConversationParticipant.objects.create(
+            conversation=self.conversation,
+            user=self.second_member,
+        )
+
+        self.owner_token = str(
+            RefreshToken.for_user(
+                self.owner,
+            ).access_token
+        )
+
+        self.member_token = str(
+            RefreshToken.for_user(
+                self.member,
+            ).access_token
+        )
+
+        self.second_member_token = str(
+            RefreshToken.for_user(
+                self.second_member,
+            ).access_token
+        )
+
+        self.outsider_token = str(
+            RefreshToken.for_user(
+                self.outsider,
+            ).access_token
+        )
+
+    async def test_participant_can_connect_with_valid_jwt(
+        self,
+    ):
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.member_token}",
+            ],
+        )
+
+        connected, subprotocol = await communicator.connect()
+
+        self.assertTrue(
+            connected,
+        )
+
+        self.assertEqual(
+            subprotocol,
+            f"jwt.{self.member_token}",
+        )
+
+        await communicator.disconnect()
+
+    async def test_non_participant_cannot_connect(
+        self,
+    ):
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.outsider_token}",
+            ],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertFalse(
+            connected,
+        )
+
+    async def test_participant_can_create_direct_message(
+        self,
+    ):
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.member_token}",
+            ],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertTrue(
+            connected,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "direct_message.create",
+                "data": {
+                    "text": "Hello direct chat",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "direct_message.created",
+        )
+
+        self.assertEqual(
+            response["data"]["text"],
+            "Hello direct chat",
+        )
+
+        self.assertEqual(
+            response["data"]["author_id"],
+            self.member.id,
+        )
+
+        self.assertEqual(
+            await direct_message_count(),
+            1,
+        )
+
+        await communicator.disconnect()
+
+    async def test_direct_message_is_broadcast_to_other_participants(
+        self,
+    ):
+        sender = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.member_token}",
+            ],
+        )
+
+        receiver = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.second_member_token}",
+            ],
+        )
+
+        sender_connected, _ = await sender.connect()
+
+        receiver_connected, _ = await receiver.connect()
+
+        self.assertTrue(
+            sender_connected,
+        )
+
+        self.assertTrue(
+            receiver_connected,
+        )
+
+        await sender.send_json_to(
+            {
+                "type": "direct_message.create",
+                "data": {
+                    "text": "Realtime DM",
+                },
+            }
+        )
+
+        sender_response = await sender.receive_json_from()
+
+        receiver_response = await receiver.receive_json_from()
+
+        self.assertEqual(
+            sender_response["type"],
+            "direct_message.created",
+        )
+
+        self.assertEqual(
+            receiver_response["type"],
+            "direct_message.created",
+        )
+
+        self.assertEqual(
+            sender_response["data"]["id"],
+            receiver_response["data"]["id"],
+        )
+
+        self.assertEqual(
+            receiver_response["data"]["text"],
+            "Realtime DM",
+        )
+
+        await sender.disconnect()
+        await receiver.disconnect()
+
+    async def test_participant_can_reply_to_direct_message(
+        self,
+    ):
+        root_message = await create_direct_test_message(
+            conversation=self.conversation,
+            author=self.owner,
+            text="Root direct message",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.member_token}",
+            ],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertTrue(
+            connected,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "direct_message.create",
+                "data": {
+                    "text": "Direct reply",
+                    "reply_to_id": root_message.id,
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "direct_message.created",
+        )
+
+        self.assertEqual(
+            response["data"]["reply_to"],
+            root_message.id,
+        )
+
+        self.assertEqual(
+            response["data"]["reply_to_message"]["text"],
+            "Root direct message",
+        )
+
+        self.assertEqual(
+            response["data"]["reply_to_message"]["author_id"],
+            self.owner.id,
+        )
+
+        await communicator.disconnect()
+
+    async def test_author_can_edit_own_direct_message(
+        self,
+    ):
+        message = await create_direct_test_message(
+            conversation=self.conversation,
+            author=self.member,
+            text="Before edit",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.member_token}",
+            ],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertTrue(
+            connected,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "direct_message.update",
+                "data": {
+                    "message_id": message.id,
+                    "text": "After edit",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "direct_message.updated",
+        )
+
+        self.assertEqual(
+            response["data"]["text"],
+            "After edit",
+        )
+
+        state = await get_direct_message_state(
+            message.id,
+        )
+
+        self.assertEqual(
+            state["text"],
+            "After edit",
+        )
+
+        self.assertIsNotNone(
+            state["edited_at"],
+        )
+
+        await communicator.disconnect()
+
+    async def test_participant_cannot_edit_another_users_direct_message(
+        self,
+    ):
+        message = await create_direct_test_message(
+            conversation=self.conversation,
+            author=self.owner,
+            text="Owner message",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.member_token}",
+            ],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertTrue(
+            connected,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "direct_message.update",
+                "data": {
+                    "message_id": message.id,
+                    "text": "Hacked text",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "error",
+        )
+
+        self.assertEqual(
+            response["data"]["code"],
+            "direct_message_edit_forbidden",
+        )
+
+        state = await get_direct_message_state(
+            message.id,
+        )
+
+        self.assertEqual(
+            state["text"],
+            "Owner message",
+        )
+
+        await communicator.disconnect()
+
+    async def test_author_can_delete_own_direct_message(
+        self,
+    ):
+        message = await create_direct_test_message(
+            conversation=self.conversation,
+            author=self.member,
+            text="Delete me",
+        )
+
+        communicator = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.member_token}",
+            ],
+        )
+
+        connected, _ = await communicator.connect()
+
+        self.assertTrue(
+            connected,
+        )
+
+        await communicator.send_json_to(
+            {
+                "type": "direct_message.delete",
+                "data": {
+                    "message_id": message.id,
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "direct_message.deleted",
+        )
+
+        self.assertIsNone(
+            response["data"]["text"],
+        )
+
+        state = await get_direct_message_state(
+            message.id,
+        )
+
+        self.assertTrue(
+            state["is_deleted"],
+        )
+
+        await communicator.disconnect()
+
+    async def test_typing_is_broadcast_to_other_participant(
+        self,
+    ):
+        sender = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.member_token}",
+            ],
+        )
+
+        receiver = WebsocketCommunicator(
+            application,
+            (f"/ws/direct-conversations/{self.conversation.id}/"),
+            subprotocols=[
+                f"jwt.{self.second_member_token}",
+            ],
+        )
+
+        sender_connected, _ = await sender.connect()
+
+        receiver_connected, _ = await receiver.connect()
+
+        self.assertTrue(
+            sender_connected,
+        )
+
+        self.assertTrue(
+            receiver_connected,
+        )
+
+        before_count = await direct_message_count()
+
+        await sender.send_json_to(
+            {
+                "type": "typing.start",
+                "data": {},
+            }
+        )
+
+        response = await receiver.receive_json_from()
+
+        self.assertEqual(
+            response["type"],
+            "typing.started",
+        )
+
+        self.assertEqual(
+            response["data"]["user_id"],
+            self.member.id,
+        )
+
+        self.assertEqual(
+            response["data"]["username"],
+            self.member.username,
+        )
+
+        after_count = await direct_message_count()
+
+        self.assertEqual(
+            before_count,
+            after_count,
+        )
+
+        await sender.disconnect()
+        await receiver.disconnect()

@@ -13,6 +13,7 @@ from .models import (
     ChannelMembership,
     DirectConversation,
     DirectConversationParticipant,
+    DirectMessage,
     Message,
 )
 
@@ -451,3 +452,124 @@ def create_group_conversation(
     )
 
     return conversation
+
+
+@transaction.atomic
+def create_direct_message(
+    *,
+    conversation,
+    author,
+    text,
+    reply_to=None,
+):
+    if not DirectConversationParticipant.objects.filter(
+        conversation=conversation,
+        user=author,
+    ).exists():
+        raise ValueError(
+            "User must be a conversation participant to send direct messages."
+        )
+
+    if reply_to is not None:
+        if reply_to.conversation_id != conversation.id:
+            raise ValueError("Reply target must belong to the same conversation.")
+
+        if reply_to.is_deleted:
+            raise ValueError("Deleted direct messages cannot be replied to.")
+
+    message = DirectMessage.objects.create(
+        conversation=conversation,
+        author=author,
+        reply_to=reply_to,
+        text=text,
+    )
+
+    conversation.updated_at = timezone.now()
+
+    conversation.save(
+        update_fields=[
+            "updated_at",
+        ],
+    )
+
+    logger.info(
+        ("Direct message created: message_id=%s conversation_id=%s author_id=%s"),
+        message.id,
+        conversation.id,
+        author.id,
+    )
+
+    return message
+
+
+@transaction.atomic
+def edit_direct_message(
+    *,
+    message,
+    text,
+):
+    if message.is_deleted:
+        raise ValueError("Deleted direct messages cannot be edited.")
+
+    message.text = text
+    message.edited_at = timezone.now()
+
+    message.save(
+        update_fields=[
+            "text",
+            "edited_at",
+            "updated_at",
+        ],
+    )
+
+    message.conversation.updated_at = timezone.now()
+
+    message.conversation.save(
+        update_fields=[
+            "updated_at",
+        ],
+    )
+
+    logger.info(
+        ("Direct message edited: message_id=%s conversation_id=%s author_id=%s"),
+        message.id,
+        message.conversation_id,
+        message.author_id,
+    )
+
+    return message
+
+
+@transaction.atomic
+def delete_direct_message(
+    *,
+    message,
+):
+    if message.is_deleted:
+        raise ValueError("Direct message is already deleted.")
+
+    message.is_deleted = True
+
+    message.save(
+        update_fields=[
+            "is_deleted",
+            "updated_at",
+        ],
+    )
+
+    message.conversation.updated_at = timezone.now()
+
+    message.conversation.save(
+        update_fields=[
+            "updated_at",
+        ],
+    )
+
+    logger.info(
+        ("Direct message deleted: message_id=%s conversation_id=%s author_id=%s"),
+        message.id,
+        message.conversation_id,
+        message.author_id,
+    )
+
+    return message

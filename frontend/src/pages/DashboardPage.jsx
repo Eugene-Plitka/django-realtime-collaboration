@@ -14,15 +14,20 @@ import AccountConnectionsLauncher from "../components/AccountConnectionsLauncher
 import ChannelAccessGate from "../components/ChannelAccessGate";
 import ChannelActionsMenu from "../components/ChannelActionsMenu";
 import CreateChannelModal from "../components/CreateChannelModal";
+import CreateDirectConversationModal from "../components/CreateDirectConversationModal";
 import CreateWorkspaceModal from "../components/CreateWorkspaceModal";
+import DirectConversationPreview from "../components/DirectConversationPreview";
 import HeaderActivityControls from "../components/HeaderActivityControls";
+import PresenceStatusDot from "../components/PresenceStatusDot";
 import SettingsContent from "../components/SettingsContent";
+import UserAvatar from "../components/UserAvatar";
 import WorkspaceActionsMenu from "../components/WorkspaceActionsMenu";
 import WorkspaceMembersPanel from "../components/WorkspaceMembersPanel";
 import { useNotifications } from "../notifications/useNotifications";
 
 
 function workspaceInitial(workspace) {
+
   return (
     workspace.name
       ?.trim()
@@ -38,15 +43,54 @@ function sortChannels(channels) {
       if (first.is_general) {
         return -1;
       }
-
       if (second.is_general) {
         return 1;
       }
-
       return first.name.localeCompare(
         second.name,
       );
     },
+  );
+}
+
+
+function directConversationTitle(
+  conversation,
+  currentUserId,
+) {
+  if (
+    conversation.type ===
+    "GROUP"
+  ) {
+    if (
+      conversation.name?.trim()
+    ) {
+      return conversation.name;
+    }
+
+    return conversation.participants
+      .filter(
+        (participant) =>
+          participant.user_id !==
+          currentUserId,
+      )
+      .map(
+        (participant) =>
+          participant.username,
+      )
+      .join(", ");
+  }
+
+  const otherParticipant =
+    conversation.participants.find(
+      (participant) =>
+        participant.user_id !==
+        currentUserId,
+    );
+
+  return (
+    otherParticipant?.username ??
+    "Direct message"
   );
 }
 
@@ -57,7 +101,6 @@ function DashboardPage() {
     logout,
     loadUser,
   } = useAuth();
-
   const {
     notifications,
     unreadCount,
@@ -68,72 +111,76 @@ function DashboardPage() {
     markRead,
     markUnread,
   } = useNotifications();
-
   const [workspaces, setWorkspaces] =
     useState([]);
-
   const [
     activeWorkspace,
     setActiveWorkspace,
   ] = useState(null);
-
   const [channels, setChannels] =
     useState([]);
-
   const [
     activeChannel,
     setActiveChannel,
   ] = useState(null);
-
+  const [
+    directConversations,
+    setDirectConversations,
+  ] = useState([]);
+  const [
+    activeDirectConversation,
+    setActiveDirectConversation,
+  ] = useState(null);
+  const [
+    directConversationsLoading,
+    setDirectConversationsLoading,
+  ] = useState(false);
+  const [
+    directConversationsError,
+    setDirectConversationsError,
+  ] = useState("");
+  const [
+    createDirectConversationModalOpen,
+    setCreateDirectConversationModalOpen,
+  ] = useState(false);
   const [
     workspaceRole,
     setWorkspaceRole,
   ] = useState(null);
-
   const [mainView, setMainView] =
     useState("chat");
-
   const [
     settingsSection,
     setSettingsSection,
   ] = useState("profile");
-  
   const [
     notificationTargetChannelId,
     setNotificationTargetChannelId,
   ] = useState(null);
-
   const [
     workspacesLoading,
     setWorkspacesLoading,
   ] = useState(true);
-
   const [
     channelsLoading,
     setChannelsLoading,
   ] = useState(false);
-
   const [
     workspaceError,
     setWorkspaceError,
   ] = useState("");
-
   const [
     channelError,
     setChannelError,
   ] = useState("");
-
   const [
     createWorkspaceModalOpen,
     setCreateWorkspaceModalOpen,
   ] = useState(false);
-
   const [
     createChannelModalOpen,
     setCreateChannelModalOpen,
   ] = useState(false);
-
-
   const publicChannels = useMemo(
     () =>
       channels.filter(
@@ -142,7 +189,6 @@ function DashboardPage() {
       ),
     [channels],
   );
-
   const privateChannels = useMemo(
     () =>
       channels.filter(
@@ -151,23 +197,101 @@ function DashboardPage() {
       ),
     [channels],
   );
-
   const canManageChannels =
     workspaceRole === "OWNER" ||
     workspaceRole === "ADMIN";
 
+  const unreadDirectConversationsCount =
+    useMemo(
+      () =>
+        directConversations.filter(
+          (conversation) =>
+            (conversation.unread_count ?? 0) > 0,
+        ).length,
+      [directConversations],
+    );
+
+  const loadDirectConversations =
+    useCallback(
+      async (workspace) => {
+        if (!workspace) {
+          setDirectConversations([]);
+          setActiveDirectConversation(
+            null,
+          );
+          return;
+        }
+        setDirectConversationsLoading(
+          true,
+        );
+        setDirectConversationsError(
+          "",
+        );
+        try {
+          const response =
+            await apiRequest(
+              `/api/workspaces/${workspace.id}/direct-conversations/`,
+            );
+          if (!response.ok) {
+            throw new Error(
+              await readApiError(
+                response,
+                "Unable to load direct messages.",
+              ),
+            );
+          }
+          const data =
+            await response.json();
+          setDirectConversations(
+            data,
+          );
+          setActiveDirectConversation(
+            (
+              currentConversation,
+            ) => {
+              if (
+                currentConversation &&
+                data.some(
+                  (conversation) =>
+                    conversation.id ===
+                    currentConversation.id,
+                )
+              ) {
+                return data.find(
+                  (conversation) =>
+                    conversation.id ===
+                    currentConversation.id,
+                );
+              }
+              return null;
+            },
+          );
+        } catch (requestError) {
+          setDirectConversationsError(
+            requestError.message,
+          );
+          setDirectConversations([]);
+          setActiveDirectConversation(
+            null,
+          );
+        } finally {
+          setDirectConversationsLoading(
+            false,
+          );
+        }
+      },
+      [],
+    );
 
   const loadWorkspaces = useCallback(
     async () => {
       setWorkspacesLoading(true);
       setWorkspaceError("");
-
       try {
         const response =
           await apiRequest(
             "/api/workspaces/",
           );
-
         if (!response.ok) {
           throw new Error(
             await readApiError(
@@ -176,18 +300,14 @@ function DashboardPage() {
             ),
           );
         }
-
         const data =
           await response.json();
-
         setWorkspaces(data);
-
         setActiveWorkspace(
           (currentWorkspace) => {
             if (!data.length) {
               return null;
             }
-
             if (currentWorkspace) {
               const existing =
                 data.find(
@@ -195,22 +315,18 @@ function DashboardPage() {
                     workspace.id ===
                     currentWorkspace.id,
                 );
-
               if (existing) {
                 return existing;
               }
             }
-
             return data[0];
           },
         );
-
         return data;
       } catch (requestError) {
         setWorkspaceError(
           requestError.message,
         );
-
         return [];
       } finally {
         setWorkspacesLoading(false);
@@ -218,7 +334,6 @@ function DashboardPage() {
     },
     [],
   );
-
 
   const loadWorkspaceData =
     useCallback(
@@ -229,10 +344,8 @@ function DashboardPage() {
           setWorkspaceRole(null);
           return;
         }
-
         setChannelsLoading(true);
         setChannelError("");
-
         try {
           const [
             channelsResponse,
@@ -245,7 +358,6 @@ function DashboardPage() {
               `/api/workspaces/${workspace.id}/members/`,
             ),
           ]);
-
           if (!channelsResponse.ok) {
             throw new Error(
               await readApiError(
@@ -254,7 +366,6 @@ function DashboardPage() {
               ),
             );
           }
-
           if (!membersResponse.ok) {
             throw new Error(
               await readApiError(
@@ -263,7 +374,6 @@ function DashboardPage() {
               ),
             );
           }
-
           const [
             channelData,
             memberData,
@@ -271,28 +381,23 @@ function DashboardPage() {
             channelsResponse.json(),
             membersResponse.json(),
           ]);
-
           const sortedChannels =
             sortChannels(
               channelData,
             );
-
           setChannels(
             sortedChannels,
           );
-
           const currentMembership =
             memberData.find(
               (membership) =>
                 membership.user_id ===
                 user.id,
             );
-
           setWorkspaceRole(
             currentMembership?.role ??
               null,
           );
-
           setActiveChannel(
             (currentChannel) => {
               if (
@@ -309,7 +414,6 @@ function DashboardPage() {
                     currentChannel.id,
                 );
               }
-
               return (
                 sortedChannels.find(
                   (channel) =>
@@ -324,7 +428,6 @@ function DashboardPage() {
           setChannelError(
             requestError.message,
           );
-
           setChannels([]);
           setActiveChannel(null);
           setWorkspaceRole(null);
@@ -335,23 +438,26 @@ function DashboardPage() {
       [user.id],
     );
 
-
   useEffect(() => {
     loadWorkspaces();
   }, [loadWorkspaces]);
 
-
   useEffect(() => {
     setActiveChannel(null);
-
+    setActiveDirectConversation(
+      null,
+    );
     loadWorkspaceData(
+      activeWorkspace,
+    );
+    loadDirectConversations(
       activeWorkspace,
     );
   }, [
     activeWorkspace,
     loadWorkspaceData,
+    loadDirectConversations,
   ]);
-
 
   useEffect(() => {
     if (
@@ -360,21 +466,17 @@ function DashboardPage() {
     ) {
       return;
     }
-
     const targetChannel =
       channels.find(
         (channel) =>
           channel.id ===
           notificationTargetChannelId,
       );
-
     if (targetChannel) {
       setActiveChannel(
         targetChannel,
       );
-
       setMainView("chat");
-
       setNotificationTargetChannelId(
         null,
       );
@@ -385,31 +487,55 @@ function DashboardPage() {
     notificationTargetChannelId,
   ]);
 
-
   function selectWorkspace(
     workspace,
   ) {
     setNotificationTargetChannelId(
       null,
     );
-
     setActiveWorkspace(
       workspace,
     );
-
     setMainView("chat");
   }
 
+  function openDirectMessages() {
+    setNotificationTargetChannelId(
+      null,
+    );
+
+    setActiveChannel(null);
+
+    setActiveDirectConversation(
+      (currentConversation) => {
+        if (
+          currentConversation &&
+          directConversations.some(
+            (conversation) =>
+              conversation.id ===
+              currentConversation.id,
+          )
+        ) {
+          return currentConversation;
+        }
+
+        return (
+          directConversations[0] ??
+          null
+        );
+      },
+    );
+
+    setMainView("direct");
+  }
 
   function openSettings() {
     setNotificationTargetChannelId(
       null,
     );
-
     setSettingsSection(
       "profile",
     );
-
     setMainView(
       "settings",
     );
@@ -419,11 +545,9 @@ function DashboardPage() {
     setNotificationTargetChannelId(
       null,
     );
-
     setSettingsSection(
       "profile",
     );
-
     setMainView(
       "settings",
     );
@@ -438,11 +562,9 @@ function DashboardPage() {
         workspace,
       ],
     );
-
     setActiveWorkspace(
       workspace,
     );
-
     setMainView("chat");
   }
 
@@ -459,7 +581,6 @@ function DashboardPage() {
               : workspace,
         ),
     );
-
     setActiveWorkspace(
       (currentWorkspace) =>
         currentWorkspace?.id ===
@@ -468,7 +589,6 @@ function DashboardPage() {
           : currentWorkspace,
     );
   }
-
 
   function handleWorkspaceRemoved(
     removedWorkspace,
@@ -479,21 +599,21 @@ function DashboardPage() {
           workspace.id !==
           removedWorkspace.id,
       );
-
     setWorkspaces(
       remainingWorkspaces,
     );
-
     const nextWorkspace =
       remainingWorkspaces[0] ??
       null;
-
     setActiveWorkspace(
       nextWorkspace,
     );
-
     setChannels([]);
     setActiveChannel(null);
+    setDirectConversations([]);
+    setActiveDirectConversation(
+      null,
+    );
     setWorkspaceRole(null);
     setMainView("chat");
   }
@@ -508,10 +628,52 @@ function DashboardPage() {
           channel,
         ]),
     );
+    setActiveDirectConversation(
+      null,
+    );
 
     setActiveChannel(channel);
     setMainView("chat");
   }
+
+  function handleDirectConversationCreated(
+    conversation,
+  ) {
+    setDirectConversations(
+      (currentConversations) => {
+        const exists =
+          currentConversations.some(
+            (currentConversation) =>
+              currentConversation.id ===
+              conversation.id,
+          );
+
+        if (exists) {
+          return [
+            conversation,
+            ...currentConversations.filter(
+              (currentConversation) =>
+                currentConversation.id !==
+                conversation.id,
+            ),
+          ];
+        }
+
+        return [
+          conversation,
+          ...currentConversations,
+        ];
+      },
+    );
+
+    setActiveDirectConversation(
+      conversation,
+    );
+
+    setActiveChannel(null);
+    setMainView("direct");
+  }
+
 
   function handleChannelUpdated(
     updatedChannel,
@@ -528,7 +690,6 @@ function DashboardPage() {
           ),
         ),
     );
-
     setActiveChannel(
       (currentChannel) =>
         currentChannel?.id ===
@@ -547,18 +708,15 @@ function DashboardPage() {
           channel.id !==
           deletedChannel.id,
       );
-
     setChannels(
       remainingChannels,
     );
-
     if (
       activeChannel?.id !==
       deletedChannel.id
     ) {
       return;
     }
-
     const nextChannel =
       remainingChannels.find(
         (channel) =>
@@ -566,11 +724,9 @@ function DashboardPage() {
       ) ??
       remainingChannels[0] ??
       null;
-
     setActiveChannel(
       nextChannel,
     );
-
     setMainView("chat");
   }
 
@@ -580,12 +736,10 @@ function DashboardPage() {
     if (!activeWorkspace) {
       return;
     }
-
     const response =
       await apiRequest(
         `/api/workspaces/${activeWorkspace.id}/channels/`,
       );
-
     if (!response.ok) {
       setChannelError(
         await readApiError(
@@ -593,20 +747,15 @@ function DashboardPage() {
           "Unable to refresh channels.",
         ),
       );
-
       return;
     }
-
     const channelData =
       await response.json();
-
     const sortedChannels =
       sortChannels(channelData);
-
     setChannels(
       sortedChannels,
     );
-
     const nextChannel =
       sortedChannels.find(
         (currentChannel) =>
@@ -618,11 +767,9 @@ function DashboardPage() {
           channel.id,
       ) ??
       null;
-
     setActiveChannel(
       nextChannel,
     );
-
     setMainView("chat");
   }
 
@@ -631,64 +778,51 @@ function DashboardPage() {
   ) {
     const updatedWorkspaces =
       await loadWorkspaces();
-
     const joinedWorkspace =
       updatedWorkspaces.find(
         (workspace) =>
           workspace.id ===
           workspaceId,
       );
-
     if (joinedWorkspace) {
       setActiveWorkspace(
         joinedWorkspace,
       );
-
       setMainView("chat");
     }
   }
-
 
   function handleOpenNotification(
     notification,
   ) {
     const payload =
       notification.payload ?? {};
-
     const workspaceId =
       payload.workspace_id;
-
     const channelId =
       payload.channel_id;
-
     if (!workspaceId) {
       return;
     }
-
     const targetWorkspace =
       workspaces.find(
         (workspace) =>
           workspace.id ===
           workspaceId,
       );
-
     if (!targetWorkspace) {
       return;
     }
-
     if (channelId) {
       setNotificationTargetChannelId(
         channelId,
       );
     }
-
     setActiveWorkspace(
       targetWorkspace,
     );
-
     setMainView("chat");
   }
-
 
   const activityControls = (
     <HeaderActivityControls
@@ -715,18 +849,56 @@ function DashboardPage() {
     />
   );
 
-
   return (
     <>
       <main className="dashboard-page channel-layout">
         <aside className="workspace-rail">
-          <div
+          <button
             className="workspace-logo"
-            title="CollabSpace"
+            type="button"
+            title="Direct Messages"
+            aria-label="Open Direct Messages"
+            onClick={
+              openDirectMessages
+            }
+            style={{
+              position: "relative",
+              padding: 0,
+              border: 0,
+              cursor: "pointer",
+            }}
           >
             C
-          </div>
 
+            {unreadDirectConversationsCount >
+              0 && (
+              <span
+                aria-label={`${unreadDirectConversationsCount} unread direct conversations`}
+                style={{
+                  position: "absolute",
+                  top: "-5px",
+                  right: "-5px",
+                  display: "grid",
+                  minWidth: "18px",
+                  height: "18px",
+                  padding: "0 5px",
+                  placeItems: "center",
+                  border: "2px solid #080d16",
+                  borderRadius: "999px",
+                  background: "#ef4444",
+                  color: "#ffffff",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  lineHeight: 1,
+                }}
+              >
+                {unreadDirectConversationsCount >
+                99
+                  ? "99+"
+                  : unreadDirectConversationsCount}
+              </span>
+            )}
+          </button>
           <div className="workspace-rail-list">
             {workspaces.map(
               (
@@ -763,7 +935,6 @@ function DashboardPage() {
               ),
             )}
           </div>
-
           <button
             className="workspace-add"
             type="button"
@@ -811,7 +982,6 @@ function DashboardPage() {
             </svg>
           </button>
         </aside>
-
         <section className="channel-sidebar">
           {mainView === "settings" ? (
             <>
@@ -820,23 +990,19 @@ function DashboardPage() {
                   <span>
                     CollabSpace
                   </span>
-
                   <strong>
                     Settings
                   </strong>
-
                   <small>
                     PERSONAL
                   </small>
                 </div>
               </div>
-
               <div className="channel-sidebar-body settings-sidebar-body">
                 <div className="settings-navigation">
                   <span className="settings-navigation-label">
                     Account
                   </span>
-
                   <button
                     className={
                       settingsSection ===
@@ -854,18 +1020,15 @@ function DashboardPage() {
                     <span>
                       P
                     </span>
-
                     <div>
                       <strong>
                         Profile
                       </strong>
-
                       <small>
                         Personal information
                       </small>
                     </div>
                   </button>
-
                   <button
                     className={
                       settingsSection ===
@@ -883,22 +1046,18 @@ function DashboardPage() {
                     <span>
                       Aa
                     </span>
-
                     <div>
                       <strong>
                         Appearance
                       </strong>
-
                       <small>
                         Interface preferences
                       </small>
                     </div>
                   </button>
-
                   <span className="settings-navigation-label settings-navigation-section">
                     Security
                   </span>
-
                   <button
                     className={
                       settingsSection ===
@@ -916,23 +1075,234 @@ function DashboardPage() {
                     <span>
                       S
                     </span>
-
                     <div>
                       <strong>
                         Sign-in Methods
                       </strong>
-
                       <small>
                         Password and providers
                       </small>
                     </div>
                   </button>
                 </div>
-
                 <div className="settings-sidebar-note">
                   Select a Workspace icon to return
                   to your channels.
                 </div>
+              </div>
+            </>
+          ) : mainView === "direct" ? (
+            <>
+              <div className="channel-sidebar-header">
+                <div className="channel-workspace-heading">
+                  <span>
+                    Messages
+                  </span>
+
+                  <strong>
+                    Direct Messages
+                  </strong>
+
+                  <small>
+                    {activeWorkspace
+                      ? activeWorkspace.name
+                      : "Workspace"}
+                  </small>
+                </div>
+
+                <button
+                  className="channel-create-icon"
+                  type="button"
+                  title="New conversation"
+                  aria-label="New conversation"
+                  onClick={() =>
+                    setCreateDirectConversationModalOpen(
+                      true,
+                    )
+                  }
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="channel-sidebar-body">
+                {directConversationsLoading && (
+                  <div className="channel-sidebar-status">
+                    Loading conversations...
+                  </div>
+                )}
+
+                {!directConversationsLoading &&
+                  directConversationsError && (
+                    <div className="channel-sidebar-error">
+                      <span>
+                        {directConversationsError}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          loadDirectConversations(
+                            activeWorkspace,
+                          )
+                        }
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+
+                {!directConversationsLoading &&
+                  !directConversationsError &&
+                  directConversations.length ===
+                    0 && (
+                    <div className="direct-messages-state">
+                      No direct messages yet.
+                    </div>
+                  )}
+
+                {!directConversationsLoading &&
+                  !directConversationsError && (
+                    <div className="direct-message-list">
+                      {directConversations.map(
+                        (conversation) => {
+                          const otherParticipant =
+                            conversation.type ===
+                            "DIRECT"
+                              ? conversation.participants.find(
+                                  (participant) =>
+                                    participant.user_id !==
+                                    user.id,
+                                )
+                              : null;
+
+                          const conversationUnreadCount =
+                            conversation.unread_count ??
+                            0;
+
+                          return (
+                            <button
+                              className={[
+                                "direct-message-list-item",
+                                activeDirectConversation
+                                  ?.id ===
+                                conversation.id
+                                  ? "active"
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              type="button"
+                              key={
+                                conversation.id
+                              }
+                              onClick={() => {
+                                setActiveDirectConversation(
+                                  conversation,
+                                );
+
+                                setActiveChannel(
+                                  null,
+                                );
+
+                                setMainView(
+                                  "direct",
+                                );
+                              }}
+                            >
+                              {conversation.type ===
+                              "DIRECT" ? (
+                                <div className="presence-avatar-shell direct-message-avatar-shell">
+                                  <UserAvatar
+                                    className="direct-message-avatar"
+                                    username={
+                                      otherParticipant
+                                        ?.username ??
+                                      "DM"
+                                    }
+                                    avatarUrl={
+                                      otherParticipant
+                                        ?.avatar_url ??
+                                      null
+                                    }
+                                  />
+
+                                  {otherParticipant && (
+                                    <PresenceStatusDot
+                                      userId={
+                                        otherParticipant
+                                          .user_id
+                                      }
+                                      status={
+                                        otherParticipant
+                                          .status
+                                      }
+                                    />
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="direct-message-group-avatar">
+                                  G
+                                </div>
+                              )}
+
+                              <span className="direct-message-list-copy">
+                                <strong>
+                                  {directConversationTitle(
+                                    conversation,
+                                    user.id,
+                                  )}
+                                </strong>
+
+                                <small>
+                                  {conversation.type ===
+                                  "GROUP"
+                                    ? `${conversation.participants.length} members`
+                                    : "Direct message"}
+                                </small>
+                              </span>
+
+                              {conversationUnreadCount >
+                                0 && (
+                                <span
+                                  aria-label={`${conversationUnreadCount} unread messages`}
+                                  style={{
+                                    display:
+                                      "grid",
+                                    minWidth:
+                                      "20px",
+                                    height:
+                                      "20px",
+                                    padding:
+                                      "0 6px",
+                                    placeItems:
+                                      "center",
+                                    borderRadius:
+                                      "999px",
+                                    background:
+                                      "#ef4444",
+                                    color:
+                                      "#ffffff",
+                                    fontSize:
+                                      "10px",
+                                    fontWeight:
+                                      800,
+                                    lineHeight:
+                                      1,
+                                  }}
+                                >
+                                  {conversationUnreadCount >
+                                  99
+                                    ? "99+"
+                                    : conversationUnreadCount}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        },
+                      )}
+                    </div>
+                  )}
               </div>
             </>
           ) : (
@@ -942,20 +1312,17 @@ function DashboardPage() {
                   <span>
                     Workspace
                   </span>
-
                   <strong>
                     {activeWorkspace
                       ? activeWorkspace.name
                       : "No workspace"}
                   </strong>
-
                   {workspaceRole && (
                     <small>
                       {workspaceRole}
                     </small>
                   )}
                 </div>
-
                 {activeWorkspace && (
                   <WorkspaceActionsMenu
                     key={activeWorkspace.id}
@@ -974,7 +1341,6 @@ function DashboardPage() {
                   />
                 )}
               </div>
-
               {activeWorkspace && (
                 <div className="channel-sidebar-body">
                   <div className="workspace-view-navigation">
@@ -985,19 +1351,21 @@ function DashboardPage() {
                           : ""
                       }
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        setActiveDirectConversation(
+                          null,
+                        );
+
                         setMainView(
                           "chat",
-                        )
-                      }
+                        );
+                      }}
                     >
                       <span>
                         #
                       </span>
-
                       Channels
                     </button>
-
                     <button
                       className={
                         mainView ===
@@ -1015,11 +1383,9 @@ function DashboardPage() {
                       <span>
                         M
                       </span>
-
                       Members
                     </button>
                   </div>
-
                   {mainView === "chat" && (
                     <>
                       {channelsLoading && (
@@ -1027,14 +1393,12 @@ function DashboardPage() {
                           Loading channels...
                         </div>
                       )}
-
                       {!channelsLoading &&
                         channelError && (
                           <div className="channel-sidebar-error">
                             <span>
                               {channelError}
                             </span>
-
                             <button
                               type="button"
                               onClick={() =>
@@ -1047,7 +1411,6 @@ function DashboardPage() {
                             </button>
                           </div>
                         )}
-
                       {!channelsLoading &&
                         !channelError && (
                           <>
@@ -1056,7 +1419,6 @@ function DashboardPage() {
                                 <span>
                                   Public channels
                                 </span>
-
                                 {canManageChannels && (
                                   <button
                                     type="button"
@@ -1070,7 +1432,6 @@ function DashboardPage() {
                                   </button>
                                 )}
                               </div>
-
                               <div className="channel-list">
                                 {publicChannels.map(
                                   (channel) => (
@@ -1090,6 +1451,10 @@ function DashboardPage() {
                                           .join(" ")}
                                         type="button"
                                         onClick={() => {
+                                          setActiveDirectConversation(
+                                            null,
+                                          );
+
                                           setActiveChannel(
                                             channel,
                                           );
@@ -1102,18 +1467,15 @@ function DashboardPage() {
                                         <span className="channel-symbol">
                                           #
                                         </span>
-
                                         <span className="channel-name">
                                           {channel.name}
                                         </span>
-
                                         {channel.is_general && (
                                           <span className="channel-general-badge">
                                             default
                                           </span>
                                         )}
                                       </button>
-
                                       <ChannelActionsMenu
                                         channel={channel}
                                         workspace={
@@ -1138,14 +1500,12 @@ function DashboardPage() {
                                 )}
                               </div>
                             </div>
-
                             <div className="channel-section">
                               <div className="channel-section-heading">
                                 <span>
                                   Private channels
                                 </span>
                               </div>
-
                               <div className="channel-list">
                                 {privateChannels.map(
                                   (channel) => (
@@ -1165,6 +1525,10 @@ function DashboardPage() {
                                           .join(" ")}
                                         type="button"
                                         onClick={() => {
+                                          setActiveDirectConversation(
+                                            null,
+                                          );
+
                                           setActiveChannel(
                                             channel,
                                           );
@@ -1177,12 +1541,10 @@ function DashboardPage() {
                                         <span className="channel-symbol private">
                                           🔒
                                         </span>
-
                                         <span className="channel-name">
                                           {channel.name}
                                         </span>
                                       </button>
-
                                       <ChannelActionsMenu
                                         channel={channel}
                                         workspace={
@@ -1207,6 +1569,8 @@ function DashboardPage() {
                                 )}
                               </div>
                             </div>
+
+
                           </>
                         )}
                     </>
@@ -1215,7 +1579,6 @@ function DashboardPage() {
               )}
             </>
           )}
-
           <div className="channel-sidebar-footer">
             <AccountConnectionsLauncher
               user={user}
@@ -1229,7 +1592,6 @@ function DashboardPage() {
             />
           </div>
         </section>
-
         <section className="channel-content">
           {mainView === "settings" ? (
             <SettingsContent
@@ -1243,44 +1605,38 @@ function DashboardPage() {
             />
           ) : (
             <>
-              {mainView !== "chat" && (
+              {mainView !== "chat" &&
+                mainView !== "direct" && (
                 <div className="standalone-activity-controls">
                   {activityControls}
                 </div>
               )}
-
               {!activeWorkspace &&
                 !workspacesLoading && (
                   <div className="standalone-activity-controls">
                     {activityControls}
                   </div>
                 )}
-
               {workspacesLoading && (
                 <div className="workspace-state">
                   <div className="state-spinner" />
-
                   <h2>
                     Loading workspaces
                   </h2>
                 </div>
               )}
-
               {!workspacesLoading &&
                 workspaceError && (
                   <div className="workspace-state">
                     <div className="state-icon error">
                       !
                     </div>
-
                     <h2>
                       Could not load workspaces
                     </h2>
-
                     <p>
                       {workspaceError}
                     </p>
-
                     <button
                       className="primary-button state-action"
                       type="button"
@@ -1292,7 +1648,6 @@ function DashboardPage() {
                     </button>
                   </div>
                 )}
-
               {!workspacesLoading &&
                 !workspaceError &&
                 workspaces.length ===
@@ -1301,18 +1656,15 @@ function DashboardPage() {
                     <div className="state-icon">
                       W
                     </div>
-
                     <h2>
                       No workspaces yet
                     </h2>
-
                     <p>
                       Create a workspace or
                       accept an invitation
                       from the top-right
                       invitation icon.
                     </p>
-
                     <button
                       className="primary-button state-action"
                       type="button"
@@ -1326,7 +1678,6 @@ function DashboardPage() {
                     </button>
                   </div>
                 )}
-
               {mainView ===
                   "members" &&
                 activeWorkspace &&
@@ -1344,6 +1695,22 @@ function DashboardPage() {
                     user={user}
                   />
                 )}
+              {mainView === "direct" &&
+                activeWorkspace &&
+                activeDirectConversation && (
+                  <DirectConversationPreview
+                    key={
+                      activeDirectConversation.id
+                    }
+                    conversation={
+                      activeDirectConversation
+                    }
+                    user={user}
+                    activityControls={
+                      activityControls
+                    }
+                  />
+                )}
 
               {mainView === "chat" &&
                 activeWorkspace &&
@@ -1354,17 +1721,14 @@ function DashboardPage() {
                     <div className="standalone-activity-controls">
                       {activityControls}
                     </div>
-
                     <div className="state-icon">
                       #
                     </div>
-
                     <h2>
                       No channels available
                     </h2>
                   </div>
                 )}
-
               {mainView === "chat" &&
                 activeWorkspace &&
                 activeChannel && (
@@ -1392,7 +1756,6 @@ function DashboardPage() {
           )}
         </section>
       </main>
-
       <CreateWorkspaceModal
         open={
           createWorkspaceModalOpen
@@ -1406,7 +1769,6 @@ function DashboardPage() {
           handleWorkspaceCreated
         }
       />
-
       <CreateChannelModal
         open={
           createChannelModalOpen
@@ -1423,9 +1785,25 @@ function DashboardPage() {
           handleChannelCreated
         }
       />
+
+      <CreateDirectConversationModal
+        open={
+          createDirectConversationModalOpen
+        }
+        workspace={
+          activeWorkspace
+        }
+        user={user}
+        onClose={() =>
+          setCreateDirectConversationModalOpen(
+            false,
+          )
+        }
+        onCreated={
+          handleDirectConversationCreated
+        }
+      />
     </>
   );
 }
-
-
 export default DashboardPage;

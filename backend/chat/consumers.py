@@ -15,6 +15,9 @@ from accounts.avatar_utils import (
 from .models import (
     Channel,
     ChannelMembership,
+    DirectConversation,
+    DirectConversationParticipant,
+    DirectMessage,
     Message,
     MessageReaction,
 )
@@ -23,11 +26,13 @@ from .permissions import (
     can_edit_message,
 )
 from .services import (
+    create_direct_message,
     create_message,
+    delete_direct_message,
     delete_message,
+    edit_direct_message,
     edit_message,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -883,6 +888,705 @@ class ChannelConsumer(AsyncJsonWebsocketConsumer):
         )
 
     async def typing_stopped(
+        self,
+        event,
+    ):
+        if event["data"]["user_id"] == self.scope["user"].id:
+            return
+
+        await self.send_json(
+            {
+                "type": "typing.stopped",
+                "data": event["data"],
+            }
+        )
+
+
+def direct_reply_to_data(
+    message,
+):
+    if message.reply_to_id is None:
+        return None
+
+    reply_to = message.reply_to
+
+    return {
+        "id": reply_to.id,
+        "author_id": reply_to.author_id,
+        "author_username": reply_to.author.username,
+        "author_avatar_url": get_user_avatar_url(
+            reply_to.author,
+        ),
+        "author_status": reply_to.author.status,
+        "text": (None if reply_to.is_deleted else reply_to.text),
+        "is_deleted": reply_to.is_deleted,
+    }
+
+
+def direct_message_to_data(
+    message,
+):
+    return {
+        "id": message.id,
+        "conversation_id": message.conversation_id,
+        "author_id": message.author_id,
+        "author_username": message.author.username,
+        "author_avatar_url": get_user_avatar_url(
+            message.author,
+        ),
+        "author_status": message.author.status,
+        "reply_to": message.reply_to_id,
+        "reply_to_message": direct_reply_to_data(
+            message,
+        ),
+        "text": (None if message.is_deleted else message.text),
+        "created_at": message.created_at.isoformat(),
+        "updated_at": message.updated_at.isoformat(),
+        "edited_at": (message.edited_at.isoformat() if message.edited_at else None),
+        "is_deleted": message.is_deleted,
+    }
+
+
+@database_sync_to_async
+def user_has_direct_conversation_access(
+    *,
+    conversation_id,
+    user,
+):
+    if not user.is_authenticated:
+        return False
+
+    return DirectConversationParticipant.objects.filter(
+        conversation_id=conversation_id,
+        user=user,
+        conversation__workspace__memberships__user=user,
+    ).exists()
+
+
+@database_sync_to_async
+def create_direct_message_for_user(
+    *,
+    conversation_id,
+    user,
+    text,
+    reply_to_id=None,
+):
+    try:
+        conversation = DirectConversation.objects.get(
+            pk=conversation_id,
+        )
+    except DirectConversation.DoesNotExist:
+        return (
+            None,
+            "conversation_not_found",
+        )
+
+    reply_to = None
+
+    if reply_to_id is not None:
+        try:
+            reply_to = DirectMessage.objects.select_related(
+                "author",
+            ).get(
+                pk=reply_to_id,
+                conversation_id=conversation_id,
+            )
+        except DirectMessage.DoesNotExist:
+            return (
+                None,
+                "reply_message_not_found",
+            )
+
+    try:
+        message = create_direct_message(
+            conversation=conversation,
+            author=user,
+            text=text,
+            reply_to=reply_to,
+        )
+    except ValueError:
+        return (
+            None,
+            "direct_message_create_failed",
+        )
+
+    message = DirectMessage.objects.select_related(
+        "author",
+        "conversation",
+        "reply_to",
+        "reply_to__author",
+    ).get(
+        pk=message.pk,
+    )
+
+    return (
+        direct_message_to_data(
+            message,
+        ),
+        None,
+    )
+
+
+@database_sync_to_async
+def update_direct_message_for_user(
+    *,
+    conversation_id,
+    message_id,
+    user,
+    text,
+):
+    try:
+        message = DirectMessage.objects.select_related(
+            "author",
+            "conversation",
+            "reply_to",
+            "reply_to__author",
+        ).get(
+            pk=message_id,
+            conversation_id=conversation_id,
+        )
+    except DirectMessage.DoesNotExist:
+        return (
+            None,
+            "direct_message_not_found",
+        )
+
+    if message.is_deleted or message.author_id != user.id:
+        return (
+            None,
+            "direct_message_edit_forbidden",
+        )
+
+    try:
+        message = edit_direct_message(
+            message=message,
+            text=text,
+        )
+    except ValueError:
+        return (
+            None,
+            "direct_message_edit_forbidden",
+        )
+
+    return (
+        direct_message_to_data(
+            message,
+        ),
+        None,
+    )
+
+
+@database_sync_to_async
+def delete_direct_message_for_user(
+    *,
+    conversation_id,
+    message_id,
+    user,
+):
+    try:
+        message = DirectMessage.objects.select_related(
+            "author",
+            "conversation",
+            "reply_to",
+            "reply_to__author",
+        ).get(
+            pk=message_id,
+            conversation_id=conversation_id,
+        )
+    except DirectMessage.DoesNotExist:
+        return (
+            None,
+            "direct_message_not_found",
+        )
+
+    if message.is_deleted or message.author_id != user.id:
+        return (
+            None,
+            "direct_message_delete_forbidden",
+        )
+
+    try:
+        message = delete_direct_message(
+            message=message,
+        )
+    except ValueError:
+        return (
+            None,
+            "direct_message_delete_forbidden",
+        )
+
+    return (
+        direct_message_to_data(
+            message,
+        ),
+        None,
+    )
+
+
+class DirectConversationConsumer(
+    AsyncJsonWebsocketConsumer,
+):
+    async def connect(self):
+        user = self.scope["user"]
+
+        if not user.is_authenticated:
+            logger.warning(
+                (
+                    "WebSocket connection rejected: "
+                    "unauthenticated direct conversation connection"
+                )
+            )
+
+            await self.close(
+                code=4401,
+            )
+            return
+
+        self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
+
+        has_access = await user_has_direct_conversation_access(
+            conversation_id=self.conversation_id,
+            user=user,
+        )
+
+        if not has_access:
+            logger.warning(
+                (
+                    "Direct WebSocket connection rejected: "
+                    "user_id=%s conversation_id=%s access_denied"
+                ),
+                user.id,
+                self.conversation_id,
+            )
+
+            await self.close(
+                code=4403,
+            )
+            return
+
+        self.group_name = f"direct_conversation_{self.conversation_id}"
+
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name,
+        )
+
+        await self.accept(
+            subprotocol=self.scope.get(
+                "jwt_subprotocol",
+            ),
+        )
+
+        logger.info(
+            ("Direct WebSocket connected: user_id=%s conversation_id=%s"),
+            user.id,
+            self.conversation_id,
+        )
+
+    async def disconnect(
+        self,
+        close_code,
+    ):
+        if hasattr(
+            self,
+            "group_name",
+        ):
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name,
+            )
+
+        user = self.scope.get(
+            "user",
+        )
+
+        logger.info(
+            (
+                "Direct WebSocket disconnected: "
+                "user_id=%s conversation_id=%s close_code=%s"
+            ),
+            (user.id if user is not None and user.is_authenticated else None),
+            getattr(
+                self,
+                "conversation_id",
+                None,
+            ),
+            close_code,
+        )
+
+    async def receive_json(
+        self,
+        content,
+        **kwargs,
+    ):
+        event_type = content.get(
+            "type",
+        )
+
+        data = content.get(
+            "data",
+            {},
+        )
+
+        if event_type == "direct_message.create":
+            await self.handle_message_create(
+                data,
+            )
+            return
+
+        if event_type == "direct_message.update":
+            await self.handle_message_update(
+                data,
+            )
+            return
+
+        if event_type == "direct_message.delete":
+            await self.handle_message_delete(
+                data,
+            )
+            return
+
+        if event_type == "typing.start":
+            await self.handle_typing_start()
+            return
+
+        if event_type == "typing.stop":
+            await self.handle_typing_stop()
+            return
+
+        await self.send_error(
+            code="unsupported_event",
+            message="Unsupported event type.",
+        )
+
+    async def send_error(
+        self,
+        *,
+        code,
+        message,
+    ):
+        user = self.scope.get(
+            "user",
+        )
+
+        logger.warning(
+            ("Direct WebSocket event rejected: user_id=%s conversation_id=%s code=%s"),
+            (user.id if user is not None and user.is_authenticated else None),
+            getattr(
+                self,
+                "conversation_id",
+                None,
+            ),
+            code,
+        )
+
+        await self.send_json(
+            {
+                "type": "error",
+                "data": {
+                    "code": code,
+                    "message": message,
+                },
+            }
+        )
+
+    async def ensure_access(
+        self,
+    ):
+        return await user_has_direct_conversation_access(
+            conversation_id=self.conversation_id,
+            user=self.scope["user"],
+        )
+
+    async def handle_message_create(
+        self,
+        data,
+    ):
+        if not await self.ensure_access():
+            await self.send_error(
+                code="conversation_access_denied",
+                message=("You no longer have access to this conversation."),
+            )
+            return
+
+        text = data.get(
+            "text",
+        )
+
+        reply_to_id = data.get(
+            "reply_to_id",
+        )
+
+        if not isinstance(
+            text,
+            str,
+        ):
+            await self.send_error(
+                code="invalid_message_text",
+                message=("Message text must be a string."),
+            )
+            return
+
+        text = text.strip()
+
+        if not text:
+            await self.send_error(
+                code="invalid_message_text",
+                message=("Message text cannot be empty."),
+            )
+            return
+
+        if reply_to_id is not None and not isinstance(
+            reply_to_id,
+            int,
+        ):
+            await self.send_error(
+                code="invalid_reply_message_id",
+                message=("Reply message id must be an integer."),
+            )
+            return
+
+        (
+            message_data,
+            error,
+        ) = await create_direct_message_for_user(
+            conversation_id=self.conversation_id,
+            user=self.scope["user"],
+            text=text,
+            reply_to_id=reply_to_id,
+        )
+
+        if error:
+            await self.send_error(
+                code=error,
+                message=("Direct message could not be created."),
+            )
+            return
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "direct_message.created",
+                "data": message_data,
+            },
+        )
+
+    async def direct_message_created(
+        self,
+        event,
+    ):
+        await self.send_json(
+            {
+                "type": "direct_message.created",
+                "data": event["data"],
+            }
+        )
+
+    async def handle_message_update(
+        self,
+        data,
+    ):
+        if not await self.ensure_access():
+            await self.send_error(
+                code="conversation_access_denied",
+                message=("You no longer have access to this conversation."),
+            )
+            return
+
+        message_id = data.get(
+            "message_id",
+        )
+
+        text = data.get(
+            "text",
+        )
+
+        if not isinstance(
+            message_id,
+            int,
+        ):
+            await self.send_error(
+                code="invalid_message_id",
+                message=("Message id must be an integer."),
+            )
+            return
+
+        if not isinstance(
+            text,
+            str,
+        ):
+            await self.send_error(
+                code="invalid_message_text",
+                message=("Message text must be a string."),
+            )
+            return
+
+        text = text.strip()
+
+        if not text:
+            await self.send_error(
+                code="invalid_message_text",
+                message=("Message text cannot be empty."),
+            )
+            return
+
+        (
+            message_data,
+            error,
+        ) = await update_direct_message_for_user(
+            conversation_id=self.conversation_id,
+            message_id=message_id,
+            user=self.scope["user"],
+            text=text,
+        )
+
+        if error:
+            await self.send_error(
+                code=error,
+                message=("Direct message could not be updated."),
+            )
+            return
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "direct_message.updated",
+                "data": message_data,
+            },
+        )
+
+    async def direct_message_updated(
+        self,
+        event,
+    ):
+        await self.send_json(
+            {
+                "type": "direct_message.updated",
+                "data": event["data"],
+            }
+        )
+
+    async def handle_message_delete(
+        self,
+        data,
+    ):
+        if not await self.ensure_access():
+            await self.send_error(
+                code="conversation_access_denied",
+                message=("You no longer have access to this conversation."),
+            )
+            return
+
+        message_id = data.get(
+            "message_id",
+        )
+
+        if not isinstance(
+            message_id,
+            int,
+        ):
+            await self.send_error(
+                code="invalid_message_id",
+                message=("Message id must be an integer."),
+            )
+            return
+
+        (
+            message_data,
+            error,
+        ) = await delete_direct_message_for_user(
+            conversation_id=self.conversation_id,
+            message_id=message_id,
+            user=self.scope["user"],
+        )
+
+        if error:
+            await self.send_error(
+                code=error,
+                message=("Direct message could not be deleted."),
+            )
+            return
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "direct_message.deleted",
+                "data": message_data,
+            },
+        )
+
+    async def direct_message_deleted(
+        self,
+        event,
+    ):
+        await self.send_json(
+            {
+                "type": "direct_message.deleted",
+                "data": event["data"],
+            }
+        )
+
+    async def handle_typing_start(
+        self,
+    ):
+        if not await self.ensure_access():
+            await self.send_error(
+                code="conversation_access_denied",
+                message=("You no longer have access to this conversation."),
+            )
+            return
+
+        user = self.scope["user"]
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "direct_typing.started",
+                "data": {
+                    "user_id": user.id,
+                    "username": user.username,
+                },
+            },
+        )
+
+    async def handle_typing_stop(
+        self,
+    ):
+        if not await self.ensure_access():
+            await self.send_error(
+                code="conversation_access_denied",
+                message=("You no longer have access to this conversation."),
+            )
+            return
+
+        user = self.scope["user"]
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "direct_typing.stopped",
+                "data": {
+                    "user_id": user.id,
+                    "username": user.username,
+                },
+            },
+        )
+
+    async def direct_typing_started(
+        self,
+        event,
+    ):
+        if event["data"]["user_id"] == self.scope["user"].id:
+            return
+
+        await self.send_json(
+            {
+                "type": "typing.started",
+                "data": event["data"],
+            }
+        )
+
+    async def direct_typing_stopped(
         self,
         event,
     ):
