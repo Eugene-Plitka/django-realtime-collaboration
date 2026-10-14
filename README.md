@@ -213,4 +213,4 @@ The full deployment process is documented in:
 
 This project is intended to be distributed under the MIT License.
 
-See the `LICENSE` file for the full license text.
+See the [`LICENSE`](LICENSE) file for the full license text.
