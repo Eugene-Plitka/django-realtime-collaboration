@@ -800,8 +800,8 @@ input {
   min-width: 0;
 }
 
-.dashboard-user strong,
-.dashboard-user span {
+.dashboard-user-copy > strong,
+.dashboard-user-copy > span {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -813,7 +813,8 @@ input {
   font-size: calc(13px * var(--font-scale));
 }
 
-.dashboard-user span {
+.dashboard-user-copy > span {
+  display: block;
   margin-top: 4px;
   color: #7d899f;
   font-size: calc(11px * var(--font-scale));
@@ -1924,9 +1925,10 @@ div {
 }
 
 .channel-sidebar-footer {
+  flex-shrink: 0;
+  margin-top: auto;
   padding: 12px;
-  border-top:
-    1px solid #1d283a;
+  border-top: 1px solid #1d283a;
   background: #0b121d;
 }
 
