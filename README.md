@@ -4,6 +4,14 @@ A full-stack real-time collaboration platform inspired by Slack, Discord, and Mi
 
 This project was built as a portfolio application to demonstrate practical backend and frontend engineering skills: Django REST APIs, WebSocket communication, authentication and authorization, PostgreSQL data modeling, Redis, Celery, Docker, testing, CI, production-oriented configuration, and a React single-page application.
 
+## Live Demo
+
+The application is deployed and available online.
+
+**[🌐 Open Live Demo](https://collabspace.eugene-dev-hub.space/)**
+
+> Demo accounts and login credentials are available on the [portfolio website](https://eugene-dev-hub.space/).
+
 ## Highlights
 
 - Django + Django REST Framework backend
