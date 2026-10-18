@@ -8772,12 +8772,10 @@ p {
 }
 
 
-.user-menu-heading strong,
-.user-menu-heading span {
+.user-menu-heading > div:last-child strong,
+.user-menu-heading > div:last-child span {
   display: block;
-
   overflow: hidden;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -8794,7 +8792,7 @@ p {
 }
 
 
-.user-menu-heading span {
+.user-menu-heading > div:last-child span {
   margin-top: 4px;
 
   color: #68768d;
