@@ -590,14 +590,6 @@ class Command(BaseCommand):
                 status=user_data["status"],
             )
 
-            if user_data["avatar"]:
-                user.avatar = user_data["avatar"]
-                user.save(
-                    update_fields=[
-                        "avatar",
-                    ]
-                )
-
             created_at = now - timedelta(
                 days=90 - (index * 3),
                 hours=index,
