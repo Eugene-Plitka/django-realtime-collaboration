@@ -151,6 +151,7 @@ function DashboardPage() {
   ] = useState(null);
   const [mainView, setMainView] =
     useState("chat");
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [
     settingsSection,
     setSettingsSection,
@@ -593,6 +594,7 @@ function DashboardPage() {
       workspace,
     );
     setMainView("chat");
+    setMobileDetailOpen(false);
   }
 
   function openDirectMessages() {
@@ -623,6 +625,7 @@ function DashboardPage() {
     );
 
     setMainView("direct");
+    setMobileDetailOpen(false);
   }
 
   function openSettings() {
@@ -635,6 +638,7 @@ function DashboardPage() {
     setMainView(
       "settings",
     );
+    setMobileDetailOpen(false);
   }
 
   function openProfileSettings() {
@@ -647,6 +651,7 @@ function DashboardPage() {
     setMainView(
       "settings",
     );
+    setMobileDetailOpen(true);
   }
 
   function handleWorkspaceCreated(
@@ -662,6 +667,7 @@ function DashboardPage() {
       workspace,
     );
     setMainView("chat");
+    setMobileDetailOpen(false);
   }
 
   function handleWorkspaceUpdated(
@@ -918,6 +924,7 @@ function DashboardPage() {
       targetWorkspace,
     );
     setMainView("chat");
+    setMobileDetailOpen(true);
   }
 
   const activityControls = (
@@ -947,7 +954,7 @@ function DashboardPage() {
 
   return (
     <>
-      <main className="dashboard-page channel-layout">
+      <main className={`dashboard-page channel-layout ${mobileDetailOpen ? "mobile-detail-open" : "mobile-list-open"}`}>
         <aside className="workspace-rail">
           <button
             className="workspace-logo"
@@ -1044,6 +1051,28 @@ function DashboardPage() {
           >
             +
           </button>
+          <div className="mobile-rail-footer">
+            <div className="mobile-rail-activity">
+              <HeaderActivityControls
+                notifications={notifications}
+                unreadCount={unreadCount}
+                notificationsLoading={notificationsLoading}
+                notificationsError={notificationsError}
+                markRead={markRead}
+                markUnread={markUnread}
+                onOpenNotification={handleOpenNotification}
+                onInvitationAccepted={handleInvitationAccepted}
+              />
+            </div>
+            <div className="mobile-rail-account">
+              <AccountConnectionsLauncher
+                user={user}
+                logout={logout}
+                onEditProfile={openProfileSettings}
+                onUserChanged={loadUser}
+              />
+            </div>
+          </div>
           <button
             className={[
               "workspace-settings-button",
@@ -1107,11 +1136,10 @@ function DashboardPage() {
                         : ""
                     }
                     type="button"
-                    onClick={() =>
-                      setSettingsSection(
-                        "profile",
-                      )
-                    }
+                    onClick={() => {
+                      setMobileDetailOpen(true);
+                      setSettingsSection("profile");
+                    }}
                   >
                     <span>
                       P
@@ -1133,11 +1161,10 @@ function DashboardPage() {
                         : ""
                     }
                     type="button"
-                    onClick={() =>
-                      setSettingsSection(
-                        "appearance",
-                      )
-                    }
+                    onClick={() => {
+                      setSettingsSection("appearance");
+                      setMobileDetailOpen(true);
+                    }}
                   >
                     <span>
                       Aa
@@ -1162,11 +1189,10 @@ function DashboardPage() {
                         : ""
                     }
                     type="button"
-                    onClick={() =>
-                      setSettingsSection(
-                        "sign-in",
-                      )
-                    }
+                    onClick={() => {
+                      setSettingsSection("sign-in");
+                      setMobileDetailOpen(true);
+                    }}
                   >
                     <span>
                       S
@@ -1300,6 +1326,7 @@ function DashboardPage() {
                                 setActiveDirectConversation(
                                   conversation,
                                 );
+                                setMobileDetailOpen(true);
 
                                 setActiveChannel(
                                   null,
@@ -1408,7 +1435,14 @@ function DashboardPage() {
           ) : (
             <>
               <div className="channel-sidebar-header">
-                <div className="channel-workspace-heading">
+                <div
+                  className="channel-workspace-heading mobile-workspace-heading"
+                  onClick={(event) => {
+                    if (window.matchMedia("(max-width: 650px)").matches && activeWorkspace) {
+                      event.currentTarget.parentElement?.querySelector(".workspace-more-button")?.click();
+                    }
+                  }}
+                >
                   <span>
                     Workspace
                   </span>
@@ -1474,11 +1508,10 @@ function DashboardPage() {
                           : ""
                       }
                       type="button"
-                      onClick={() =>
-                        setMainView(
-                          "members",
-                        )
-                      }
+                      onClick={() => {
+                        setMainView("members");
+                        setMobileDetailOpen(true);
+                      }}
                     >
                       <span>
                         M
@@ -1558,6 +1591,7 @@ function DashboardPage() {
                                           setActiveChannel(
                                             channel,
                                           );
+                                          setMobileDetailOpen(true);
 
                                           setMainView(
                                             "chat",
@@ -1632,6 +1666,7 @@ function DashboardPage() {
                                           setActiveChannel(
                                             channel,
                                           );
+                                          setMobileDetailOpen(true);
 
                                           setMainView(
                                             "chat",
@@ -1693,6 +1728,10 @@ function DashboardPage() {
           </div>
         </section>
         <section className="channel-content">
+          <div className="mobile-detail-header">
+            <button type="button" onClick={() => setMobileDetailOpen(false)} aria-label="Back to conversations">←</button>
+            <strong>{mainView === "settings" ? "Settings" : mainView === "members" ? "Members" : mainView === "direct" ? (activeDirectConversation ? directConversationTitle(activeDirectConversation, user.id) : "Messages") : (activeChannel?.name ?? "Channels")}</strong>
+          </div>
           {mainView === "settings" ? (
             <SettingsContent
               section={

@@ -208,6 +208,7 @@ function DirectConversationChat({
     useState(null);
   const [editText, setEditText] =
     useState("");
+  const [mobileMessageMenuId, setMobileMessageMenuId] = useState(null);
   const [pendingDeleteMessageId, setPendingDeleteMessageId] =
     useState(null);
   const [highlightedMessageId, setHighlightedMessageId] =
@@ -1281,7 +1282,15 @@ function DirectConversationChat({
 
                         {!message.is_deleted &&
                           !isEditing && (
-                            <div className="message-actions">
+                            <div className={`message-actions ${mobileMessageMenuId === message.id ? "mobile-actions-open" : ""}`}>
+                            <button
+                              className="mobile-message-more"
+                              type="button"
+                              aria-label="Message actions"
+                              aria-expanded={mobileMessageMenuId === message.id}
+                              onClick={() => setMobileMessageMenuId((current) => current === message.id ? null : message.id)}
+                            >•••</button>
+                            <div className="mobile-message-action-items">
                               {!isDeletePending && (
                                 <button
                                   type="button"
@@ -1354,6 +1363,7 @@ function DirectConversationChat({
                                   </button>
                                 </div>
                               )}
+                              </div>
                             </div>
                           )}
                       </div>

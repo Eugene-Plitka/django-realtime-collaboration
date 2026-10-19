@@ -13,6 +13,7 @@ import {
   AuthProvider,
 } from "./auth/AuthContext";
 import "./index.css";
+import "./mobile.css";
 import {
   PresenceProvider,
 } from "./presence/PresenceContext";
