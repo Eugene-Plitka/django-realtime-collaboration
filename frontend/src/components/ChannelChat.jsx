@@ -836,10 +836,12 @@ function ChannelChat({
     ) {
       return;
     }
-    bottomRef.current
-      ?.scrollIntoView({
-        behavior: "smooth",
-      });
+    // Scroll only the chat pane. scrollIntoView can move the entire
+    // browser viewport on mobile when the chat is nested in the layout.
+    const chatBody = bottomRef.current?.closest(".chat-body");
+    if (chatBody) {
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
     shouldScrollRef.current =
       false;
   }, [messages]);
@@ -1167,10 +1169,16 @@ function ChannelChat({
     if (!element) {
       return;
     }
-    element.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
+    const chatBody = element.closest(".chat-body");
+    if (chatBody) {
+      const bodyRect = chatBody.getBoundingClientRect();
+      const messageRect = element.getBoundingClientRect();
+      chatBody.scrollTo({
+        top: chatBody.scrollTop + messageRect.top - bodyRect.top
+          - (chatBody.clientHeight - messageRect.height) / 2,
+        behavior: "smooth",
+      });
+    }
     setHighlightedMessageId(
       messageId,
     );

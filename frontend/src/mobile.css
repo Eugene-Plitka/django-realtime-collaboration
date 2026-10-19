@@ -1,5 +1,27 @@
 /* CollabSpace mobile master-detail navigation (desktop untouched). */
 @media (max-width: 650px) {
+  /* The chat owns scrolling; the document itself never moves. */
+  html, body, #root {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  .dashboard-page.channel-layout {
+    max-height: 100dvh;
+    overscroll-behavior: none;
+  }
+  .channel-content, .channel-sidebar {
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+  .channel-content .chat-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
   .dashboard-page.channel-layout {
     grid-template-columns: 62px minmax(0, 1fr);
     height: 100dvh;

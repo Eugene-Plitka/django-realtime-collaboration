@@ -647,10 +647,11 @@ function DirectConversationChat({
 
     window.requestAnimationFrame(
       () => {
-        bottomRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "end",
-        });
+        // Keep auto-scroll confined to the messages pane, not the page.
+        const chatBody = bottomRef.current?.closest(".chat-body");
+        if (chatBody) {
+          chatBody.scrollTop = chatBody.scrollHeight;
+        }
       },
     );
   }, [messages]);
@@ -931,10 +932,16 @@ function DirectConversationChat({
       return;
     }
 
-    element.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
+    const chatBody = element.closest(".chat-body");
+    if (chatBody) {
+      const bodyRect = chatBody.getBoundingClientRect();
+      const messageRect = element.getBoundingClientRect();
+      chatBody.scrollTo({
+        top: chatBody.scrollTop + messageRect.top - bodyRect.top
+          - (chatBody.clientHeight - messageRect.height) / 2,
+        behavior: "smooth",
+      });
+    }
 
     setHighlightedMessageId(
       messageId,
